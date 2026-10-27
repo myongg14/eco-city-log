@@ -20,7 +20,10 @@ import { reflectionFormView } from './views/reflection-form.js';
 import { portfolioView } from './views/portfolio.js';
 import { searchView } from './views/search.js';
 import { backupView } from './views/backup.js';
-import { fetchUnreadComments } from './records.js';
+import { scheduleView } from './views/schedule.js';
+import { rolesView } from './views/roles.js';
+import { alertsView } from './views/alerts.js';
+import { fetchAlerts } from './records.js';
 
 const state = {
   session: null,
@@ -30,7 +33,7 @@ const state = {
   previousLoginAt: null,
 };
 
-const unread = { at: 0, count: 0 };   // 새 피드백 숫자 (1분 동안 기억)
+const unread = { at: 0, count: 0 };   // 새 알림 숫자 (1분 동안 기억)
 
 const appEl = document.getElementById('app');
 const navEl = document.getElementById('nav');
@@ -69,7 +72,13 @@ export async function logout() {
   go('/login');
 }
 
-const ctx = { state, go, refreshMe, logout };
+function clearAlertBadge() {
+  unread.count = 0;
+  unread.at = Date.now();
+  navEl.querySelector('.nav-badge')?.remove();
+}
+
+const ctx = { state, go, refreshMe, logout, clearAlertBadge };
 
 function isStaff() {
   return state.me && (state.me.role === 'admin' || state.me.role === 'teacher');
@@ -85,9 +94,11 @@ function renderNav(current) {
   }
   const links = [
     { path: '/home', label: '홈' },
+    { path: '/alerts', label: '🔔 알림' },
     { path: '/records', label: isStaff() ? '학생 기록' : '내 기록', also: '/reflection/' },
     { path: '/portfolio', label: '생기부' },
-    { path: '/teams', label: '팀', also: '/team/' },
+    { path: '/teams', label: '팀', also: '/team/', also2: '/roles' },
+    { path: '/schedule', label: '일정' },
     { path: '/tasks', label: '할 일' },
     { path: '/supplies', label: '물품' },
     { path: '/gallery', label: '갤러리' },
@@ -99,11 +110,11 @@ function renderNav(current) {
   if (isStaff()) links.push({ path: '/admin', label: '관리' });
   navEl.hidden = false;
   render(navEl, html`
-    ${links.map((l) => html`<a href="#${l.path}" class="${current.startsWith(l.path) || (l.also && current.startsWith(l.also)) ? 'active' : ''}">${l.label}</a>`)}
+    ${links.map((l) => html`<a href="#${l.path}" class="${current.startsWith(l.path) || (l.also && current.startsWith(l.also)) || (l.also2 && current.startsWith(l.also2)) ? 'active' : ''}">${l.label}</a>`)}
     <button type="button" class="link-button" id="logout-btn">로그아웃</button>
   `);
   navEl.querySelector('#logout-btn').addEventListener('click', logout);
-  if (state.me.role === 'student') showUnreadBadge(current);
+  showAlertBadge(current);
   // 휴대폰에서 메뉴가 옆으로 밀릴 때 지금 화면 메뉴가 보이게 가운데로 옮겨요.
   const active = navEl.querySelector('a.active');
   if (active && navEl.scrollWidth > navEl.clientWidth) {
@@ -111,22 +122,20 @@ function renderNav(current) {
   }
 }
 
-// 내 기록에 새 피드백 댓글이 있으면 '내 기록' 메뉴에 숫자를 붙여요. 1분에 한 번만 확인해요.
-async function showUnreadBadge(current) {
-  if (current.startsWith('/records')) {
-    unread.count = 0;
-    unread.at = Date.now();
-  } else if (Date.now() - unread.at > 60000) {
+// 새 알림(피드백, 배정된 할 일, 물품 결과 등)이 있으면 '알림' 메뉴에 숫자를 붙여요. 1분에 한 번만 확인해요.
+async function showAlertBadge(current) {
+  if (current.startsWith('/alerts')) return;
+  if (Date.now() - unread.at > 60000) {
     try {
-      unread.count = (await fetchUnreadComments(state.me.user_id)).length;
+      unread.count = (await fetchAlerts(state.me)).newCount;
       unread.at = Date.now();
     } catch {
       return;
     }
   }
-  const link = navEl.querySelector('a[href="#/records"]');
+  const link = navEl.querySelector('a[href="#/alerts"]');
   if (link && unread.count && !link.querySelector('.nav-badge')) {
-    link.insertAdjacentHTML('beforeend', `<span class="nav-badge" aria-label="새 피드백">${unread.count}</span>`);
+    link.insertAdjacentHTML('beforeend', `<span class="nav-badge" aria-label="새 알림">${unread.count}</span>`);
   }
 }
 
@@ -217,6 +226,12 @@ async function route() {
       return isStudent ? planView(appEl, ctx) : go('/records');
     case '/library':
       return libraryView(appEl, ctx);
+    case '/alerts':
+      return alertsView(appEl, ctx);
+    case '/schedule':
+      return scheduleView(appEl, ctx, params);
+    case '/roles':
+      return rolesView(appEl, ctx, params);
     case '/portfolio':
       return portfolioView(appEl, ctx, params);
     case '/search':

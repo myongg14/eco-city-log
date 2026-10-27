@@ -8,7 +8,8 @@ const TABLES = [
   ['teams', '팀'], ['profiles', '계정', 'user_id, login_id, display_name, role, team_id, role_desc, career_goal, last_login_at, created_at'],
   ['plans', '계획서'], ['activity_logs', '활동 일지'], ['log_participants', '같이 한 팀원'], ['research_notes', '이론 조사'],
   ['reflections', '성찰'], ['comments', '피드백 댓글'], ['tasks', '할 일'], ['purchase_requests', '물품 신청'],
-  ['notices', '공지'], ['log_photos', '사진 목록'], ['app_settings', '설정'],
+  ['notices', '공지'], ['schedule_events', '통합 일정'], ['integration_checks', '통합 테스트'], ['role_assignments', '역할 분담'],
+  ['role_history', '역할 변경 이력'], ['log_photos', '사진 목록'], ['app_settings', '설정'],
 ];
 
 const LOG_COLS = [['log_date', '날짜'], ['minutes', '활동 시간(분)'], ['activity_type', '활동 유형'], ['did', '한 일'], ['problem', '문제와 해결'],

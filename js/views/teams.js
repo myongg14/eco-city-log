@@ -2,6 +2,8 @@ import { html, render } from '../ui.js';
 import { fetchPeople, fetchTasks, fetchPurchases, fetchResearch, fetchLogs, personName, formatDate, won, SPENT_STATUSES } from '../records.js';
 import { sb, friendlyError } from '../api.js';
 import { taskCard } from './tasks.js';
+import { roleTable, historyList } from './roles.js';
+import { fetchRoles, fetchRoleHistory } from '../records.js';
 
 function progress(tasks) {
   if (!tasks.length) return null;
@@ -15,10 +17,10 @@ function bar(pct) {
 async function loadAll() {
   const plans = await sb.from('plans').select('user_id');
   if (plans.error) throw new Error(friendlyError(plans.error));
-  const [people, tasks, purchases, research, logs] = await Promise.all([
-    fetchPeople(), fetchTasks(), fetchPurchases(), fetchResearch(), fetchLogs(),
+  const [people, tasks, purchases, research, logs, roles, history] = await Promise.all([
+    fetchPeople(), fetchTasks(), fetchPurchases(), fetchResearch(), fetchLogs(), fetchRoles(), fetchRoleHistory(),
   ]);
-  return { people, tasks, purchases, research, logs, planned: new Set(plans.data.map((p) => p.user_id)) };
+  return { people, tasks, purchases, research, logs, roles, history, planned: new Set(plans.data.map((p) => p.user_id)) };
 }
 
 // 팀 목록: 팀별 진행률, 기록 수, 쓴 예산
@@ -35,7 +37,8 @@ export async function teamsView(el, ctx) {
   render(el, html`
     <section class="card">
       <h1 class="title">팀</h1>
-      <p class="muted">팀을 누르면 팀원, 할 일, 최근 기록, 쓴 예산을 볼 수 있어요. 진행률은 할 일 보드에서 완료한 비율이에요.</p>
+      <p class="muted">팀을 누르면 팀원, 역할, 할 일, 최근 기록, 쓴 예산을 볼 수 있어요. 진행률은 할 일 보드에서 완료한 비율이에요.</p>
+      <div class="title-actions"><a class="secondary" href="#/roles">👥 전체 역할 분담</a><a class="secondary" href="#/schedule">📅 통합 일정</a></div>
     </section>
     <div class="team-grid">
       ${teams.map((t) => {
@@ -107,6 +110,13 @@ export async function teamView(el, ctx, teamId) {
               일지 ${d.logs.filter((l) => l.author_id === p.user_id).length} · 조사 ${d.research.filter((r) => r.author_id === p.user_id).length}</span>
           </li>`)}
       </ul>
+    </section>
+
+    <section class="card">
+      <div class="title-row"><h2 class="subtitle">역할 분담</h2><a class="link small" href="#/roles">전체 역할 분담</a></div>
+      ${roleTable(d.roles.filter((r) => members.some((p) => p.user_id === r.user_id)), { people: d.people })}
+      ${d.history.some((h) => members.some((p) => p.user_id === h.user_id)) ? html`
+        <details><summary>역할 변경 이력</summary>${historyList(d.history.filter((h) => members.some((p) => p.user_id === h.user_id)), d.people, 10)}</details>` : ''}
     </section>
 
     <section class="card">

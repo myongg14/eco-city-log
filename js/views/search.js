@@ -1,5 +1,5 @@
 import { html, render } from '../ui.js';
-import { fetchPeople, fetchResearch, fetchLogs, fetchPurchases, fetchNotices, fetchTasks, fetchReflections, personName, shortDate, weekLabel } from '../records.js';
+import { fetchPeople, fetchResearch, fetchLogs, fetchPurchases, fetchNotices, fetchTasks, fetchReflections, fetchEvents, personName, shortDate, weekLabel } from '../records.js';
 
 // 통합 검색: 일지, 조사, 성찰, 물품, 공지, 할 일을 한 번에 찾아요.
 export async function searchView(el, ctx, params) {
@@ -9,12 +9,12 @@ export async function searchView(el, ctx, params) {
 
   let people, data;
   try {
-    const [p, logs, research, purchases, notices, tasks, reflections] = await Promise.all([
+    const [p, logs, research, purchases, notices, tasks, reflections, events] = await Promise.all([
       fetchPeople(), fetchLogs(), fetchResearch(), fetchPurchases(), fetchNotices(), fetchTasks(),
-      fetchReflections(isStaff ? {} : { authorId: me.user_id }),
+      fetchReflections(isStaff ? {} : { authorId: me.user_id }), fetchEvents(),
     ]);
     people = p;
-    data = { logs, research, purchases, notices, tasks, reflections };
+    data = { logs, research, purchases, notices, tasks, reflections, events };
   } catch (err) {
     render(el, html`<section class="card"><p class="message error">${err.message}</p></section>`);
     return;
@@ -34,6 +34,8 @@ export async function searchView(el, ctx, params) {
     { label: '물품', rows: data.purchases, text: (p) => [p.item_name, p.usage, p.reason, p.status],
       title: (p) => p.item_name, meta: (p) => `${who(p.requester_id)} · ${p.status}`, href: () => '#/supplies' },
     { label: '공지', rows: data.notices, text: (n) => [n.title, n.body], title: (n) => n.title, meta: (n) => shortDate(n.created_at), href: () => '#/home' },
+    { label: '일정', rows: data.events, text: (e) => [e.title, e.detail, e.kind], title: (e) => e.title,
+      meta: (e) => `${shortDate(e.event_date)} · ${e.kind}`, href: (e) => `#/schedule?m=${e.event_date.slice(0, 7)}` },
     { label: '할 일', rows: data.tasks, text: (t) => [t.title, t.detail], title: (t) => t.title,
       meta: (t) => `${t.assignee_id ? who(t.assignee_id) : '담당 없음'} · ${t.status}`, href: () => '#/tasks?f=all' },
   ];
@@ -41,7 +43,7 @@ export async function searchView(el, ctx, params) {
   render(el, html`
     <section class="card">
       <h1 class="title">검색</h1>
-      <p class="muted">기록, 자료, 물품, 공지, 할 일을 한 번에 찾아요. ${isStaff ? '' : '성찰은 내 것만 찾아져요.'}</p>
+      <p class="muted">기록, 자료, 물품, 공지, 일정, 할 일을 한 번에 찾아요. ${isStaff ? '' : '성찰은 내 것만 찾아져요.'}</p>
       <input id="sq" type="search" placeholder="예: 태양광, 센서, 배터리" value="${params.get('q') || ''}" autofocus>
       <p class="hint" id="s-count"></p>
     </section>

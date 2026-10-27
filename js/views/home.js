@@ -1,14 +1,14 @@
 import { html, render, formatDateTime } from '../ui.js';
 import { PROJECT_DEADLINE } from '../config.js';
 import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchNotices, fetchTasks, fetchPurchases, fetchBudget, budgetSummary, personName, formatDate, won,
-  fetchReflections, fetchUnreadComments, weekMonday } from '../records.js';
+  fetchReflections, fetchUnreadComments, weekMonday, fetchEvents, kstDay, addDays, shortDate } from '../records.js';
 import { noticeBoard } from './notices.js';
 import { taskCard } from './tasks.js';
 
 // 다음 단계에 열릴 메뉴들. 열리면 이 목록에서 빼고 nav 에 넣습니다.
 const UPCOMING = [
-  { title: '통합 일정·통합 테스트', desc: '모든 팀의 마감과 모형을 합치는 날을 한 달력에, 통합 테스트 체크리스트.' },
-  { title: '기능 구현 현황·측정 기록장', desc: '친환경 기능별 진행 단계와 측정값 그래프.' },
+  { title: '기능 구현 현황표', desc: '친환경 기능별로 설계 → 부품 확보 → 제작 → 작동 확인 단계를 표시해요.' },
+  { title: '실험·측정 기록장', desc: '측정값을 표로 넣으면 그래프로 보여 줘요.' },
   { title: '팀원 상호 피드백·팀 간 요청', desc: '서로의 기여를 한 줄씩 칭찬하고, 다른 팀에 사양을 묻는 게시판.' },
 ];
 
@@ -55,7 +55,7 @@ export async function homeView(el, ctx) {
   draw();
 
   try {
-    const [notices, tasks, purchases, total, people, plan, myResearch, myLogs, recentResearch, recentLogs, myRefl, unread] = await Promise.all([
+    const [notices, tasks, purchases, total, people, plan, myResearch, myLogs, recentResearch, recentLogs, myRefl, unread, events] = await Promise.all([
       fetchNotices({ limit: 5 }),
       fetchTasks(),
       fetchPurchases(),
@@ -68,7 +68,11 @@ export async function homeView(el, ctx) {
       fetchLogs({ limit: 5 }),
       isStudent ? fetchReflections({ authorId: me.user_id }) : [],
       isStudent ? fetchUnreadComments(me.user_id) : [],
+      fetchEvents(),
     ]);
+    const today = kstDay();
+    const nextEvents = events.filter((e) => (e.end_date || e.event_date) >= today && e.event_date <= addDays(today, 14)
+      && (!isStudent || !e.team_id || e.team_id === me.team_id)).slice(0, 4);
     const thisWeekDone = myRefl.some((r) => r.kind === '주간' && r.week_of === weekMonday());
     const recent = [
       ...recentResearch.map((r) => ({ when: r.created_at, kind: '이론 조사', text: r.title, who: r.author_id, team: r.team_id })),
@@ -95,6 +99,12 @@ export async function homeView(el, ctx) {
         ${soon.length ? html`<div class="timeline">${soon.map((t) => taskCard(t, { people, teams, me, compact: true }))}</div>`
           : html`<p class="muted">${isStudent ? '이번 주에 마감인 내 할 일이 없어요.' : '이번 주 마감인 할 일이 없어요.'}</p>`}
       </section>
+      ${nextEvents.length ? html`
+        <section class="card">
+          <div class="title-row"><h2 class="subtitle">📅 2주 안의 일정</h2><a class="link small" href="#/schedule">통합 일정</a></div>
+          <ul class="recent">${nextEvents.map((e) => html`<li><span class="badge ${e.kind === '통합' ? 'warn' : ''}">${e.kind}</span>
+            <span class="recent-text">${e.title}</span><span class="muted small">${shortDate(e.event_date)}${e.end_date ? ` ~ ${shortDate(e.end_date)}` : ''}</span></li>`)}</ul>
+        </section>` : ''}
       <section class="card">
         <div class="title-row"><h2 class="subtitle">물품 · 예산</h2><a class="link small" href="#/supplies${waiting.length && me.role === 'teacher' ? '?t=wait' : ''}">물품 신청</a></div>
         <p>${me.role === 'teacher' && waiting.length ? html`<strong class="warn-text">승인 대기 ${waiting.length}건</strong> · ` : waiting.length ? `승인 대기 ${waiting.length}건 · ` : ''}남은 예산 <strong>${won(b.left)}</strong> / ${won(b.total)}</p>

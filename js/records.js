@@ -217,3 +217,85 @@ export async function fetchUnreadComments(userId) {
   const since = seen[0]?.seen_at ? new Date(seen[0].seen_at) : new Date(0);
   return rows.filter((c) => c.author_id !== userId && new Date(c.created_at) > since);
 }
+
+// ---------------------------------------------------------------------
+// 5단계: 통합 일정, 통합 테스트, 역할 분담, 알림
+// ---------------------------------------------------------------------
+
+export const EVENT_KINDS = ['마감', '통합', '발표', '회의', '기타'];
+export const CHECK_STATUSES = ['대기', '통과', '실패'];
+export const ROLE_STATUSES = ['예정', '진행 중', '완료'];
+
+export async function fetchEvents() {
+  return run(sb.from('schedule_events').select('*').order('event_date'));
+}
+
+export async function fetchChecks() {
+  return run(sb.from('integration_checks').select('*').order('sort_order').order('id'));
+}
+
+export async function fetchRoles() {
+  return run(sb.from('role_assignments').select('*').order('id'));
+}
+
+export async function fetchRoleHistory() {
+  return run(sb.from('role_history').select('*').order('changed_at', { ascending: false }));
+}
+
+// 사이트 안 알림. 마지막으로 알림을 확인한 뒤에 생긴 것은 new 로 표시해요.
+export async function fetchAlerts(me) {
+  const isStudent = me.role === 'student';
+  const [seenRows, tasks, purchases, events, checks, comments] = await Promise.all([
+    run(sb.from('notification_seen').select('seen_at').eq('user_id', me.user_id)),
+    isStudent ? fetchTasks({ assigneeId: me.user_id }) : [],
+    fetchPurchases(),
+    fetchEvents(),
+    fetchChecks(),
+    isStudent ? run(sb.from('comments').select('*').eq('target_author', me.user_id).order('created_at', { ascending: false })) : [],
+  ]);
+  const since = seenRows[0]?.seen_at ? new Date(seenRows[0].seen_at) : new Date(0);
+  const isNew = (t) => !!t && new Date(t) > since;
+  const today = kstDay();
+  const soon = addDays(today, 3);
+  const out = [];
+  const push = (a) => out.push({ ...a, isNew: isNew(a.when) });
+
+  for (const c of comments) {
+    if (c.author_id === me.user_id) continue;
+    push({ icon: '💬', kind: '피드백', text: c.body, when: c.created_at, href: '#/records' });
+  }
+  for (const t of tasks) {
+    if (t.status === '완료') continue;
+    push({ icon: '📋', kind: '내게 배정된 할 일', text: t.title, when: t.created_at, href: '#/tasks' });
+    if (t.due_date && t.due_date <= addDays(today, 2)) {
+      out.push({ icon: '⏰', kind: t.due_date < today ? '마감 지남' : '마감 임박', text: `${t.title} (${shortDate(t.due_date)})`,
+        when: null, href: '#/tasks', urgent: true });
+    }
+  }
+  for (const p of purchases) {
+    if (isStudent && p.requester_id === me.user_id && ['승인', '반려'].includes(p.status) && p.decided_at) {
+      push({ icon: p.status === '승인' ? '✅' : '↩️', kind: `물품 ${p.status}`,
+        text: p.status === '반려' ? `${p.item_name} · 사유: ${p.reject_reason || '-'}` : p.item_name, when: p.decided_at, href: '#/supplies?t=mine' });
+    }
+    if (me.role === 'teacher' && p.status === '신청') {
+      push({ icon: '🛒', kind: '승인 대기', text: `${p.item_name} · ${won(p.total_price)}`, when: p.created_at, href: '#/supplies?t=wait' });
+    }
+    if (me.role === 'admin' && p.status === '승인') {
+      push({ icon: '🛒', kind: '구매할 물품', text: `${p.item_name} · ${won(p.total_price)}`, when: p.decided_at, href: '#/supplies?t=buy' });
+    }
+  }
+  for (const e of events) {
+    if (isStudent && e.team_id && e.team_id !== me.team_id) continue;
+    const end = e.end_date || e.event_date;
+    if (end >= today && e.event_date <= soon) {
+      out.push({ icon: '📅', kind: e.event_date <= today ? '오늘 일정' : '다가오는 일정', text: `${e.title} (${shortDate(e.event_date)})`,
+        when: null, href: `#/schedule?m=${e.event_date.slice(0, 7)}`, urgent: e.event_date <= today });
+    }
+  }
+  for (const c of checks) {
+    if (c.status !== '실패' || (isStudent && c.team_id && c.team_id !== me.team_id)) continue;
+    out.push({ icon: '🧪', kind: '통합 테스트 실패', text: `${c.title}${c.note ? ` · ${c.note}` : ''}`, when: null, href: '#/schedule?t=test', urgent: true });
+  }
+  out.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || (b.when || '').localeCompare(a.when || ''));
+  return { list: out, newCount: out.filter((a) => a.isNew).length };
+}
