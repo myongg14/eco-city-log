@@ -1,5 +1,5 @@
 import { html, render } from '../ui.js';
-import { fetchPeople, fetchResearch, fetchLogs, fetchPurchases, fetchNotices, fetchTasks, fetchReflections, fetchEvents, personName, shortDate, weekLabel } from '../records.js';
+import { fetchPeople, fetchResearch, fetchLogs, fetchPurchases, fetchNotices, fetchTasks, fetchReflections, fetchEvents, fetchMeasurements, fetchRequests, personName, shortDate, weekLabel } from '../records.js';
 
 // 통합 검색: 일지, 조사, 성찰, 물품, 공지, 할 일을 한 번에 찾아요.
 export async function searchView(el, ctx, params) {
@@ -9,12 +9,12 @@ export async function searchView(el, ctx, params) {
 
   let people, data;
   try {
-    const [p, logs, research, purchases, notices, tasks, reflections, events] = await Promise.all([
+    const [p, logs, research, purchases, notices, tasks, reflections, events, measures, requests] = await Promise.all([
       fetchPeople(), fetchLogs(), fetchResearch(), fetchPurchases(), fetchNotices(), fetchTasks(),
-      fetchReflections(isStaff ? {} : { authorId: me.user_id }), fetchEvents(),
+      fetchReflections(isStaff ? {} : { authorId: me.user_id }), fetchEvents(), fetchMeasurements(), fetchRequests(),
     ]);
     people = p;
-    data = { logs, research, purchases, notices, tasks, reflections, events };
+    data = { logs, research, purchases, notices, tasks, reflections, events, measures, requests };
   } catch (err) {
     render(el, html`<section class="card"><p class="message error">${err.message}</p></section>`);
     return;
@@ -28,6 +28,10 @@ export async function searchView(el, ctx, params) {
       href: (l) => `#/records?u=${loginOf(l.author_id)}&f=log` },
     { label: '이론 조사', rows: data.research, text: (r) => [r.title, r.summary, r.application, r.new_question, r.source_author, r.source_publisher, (r.subjects || []).join(' ')],
       title: (r) => r.title, meta: (r) => `${who(r.author_id)} · ${r.source_type}`, href: (r) => `#/records?u=${loginOf(r.author_id)}&f=research` },
+    { label: '측정 기록', rows: data.measures, text: (m) => [m.title, m.x_label, m.y_label, m.unit, m.conclusion],
+      title: (m) => m.title, meta: (m) => `${who(m.author_id)} · ${shortDate(m.measured_on)}`, href: () => '#/measure?f=all' },
+    { label: '팀 간 요청', rows: data.requests, text: (r) => [r.title, r.body, r.status], title: (r) => r.title,
+      meta: (r) => `${who(r.author_id)} · ${r.status}`, href: () => '#/requests?f=all' },
     { label: '성찰', rows: data.reflections, text: (r) => [r.best, r.hardship, r.learned, r.changed, r.next_inquiry, (r.competencies || []).join(' ')],
       title: (r) => r.best, meta: (r) => `${who(r.author_id)} · ${r.kind === '최종' ? '최종 성찰' : weekLabel(r.week_of)}`,
       href: (r) => `#/records?u=${loginOf(r.author_id)}&f=reflection` },

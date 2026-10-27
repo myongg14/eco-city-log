@@ -3,6 +3,7 @@ import { fetchMyProfile } from '../api.js';
 import { html, render, toast, copyText } from '../ui.js';
 import {
   fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchJoinedLogs, fetchReflections,
+  fetchPeerFeedback, fetchRequests, fetchReplies, fetchMeasurements,
   findVague, splitLines, formatDate, shortDate, weekLabel, addDays, kstDay, COMPETENCIES,
 } from '../records.js';
 
@@ -24,6 +25,8 @@ function areasOf(kind, r) {
   if (r.areas?.length) return r.areas;
   if (kind === 'reflection') return ['진로'];
   if (kind === 'research') return ['동아리'];
+  if (kind === 'measure') return ['동아리'];
+  if (['peer', 'request', 'reply'].includes(kind)) return ['자율'];
   return ['회의', '발표'].includes(r.activity_type) ? ['자율'] : ['동아리'];
 }
 
@@ -46,12 +49,16 @@ function compose(sentences, limit = DRAFT_LIMIT) {
   return out;
 }
 
-function buildDrafts({ profile, team, plan, logs, joined, research, reflections }) {
+function buildDrafts({ profile, team, plan, logs, joined, research, reflections, peer = [], asked = [], answered = [], measures = [] }) {
   const all = [
     ...logs.map((r) => ({ kind: 'log', r })),
     ...joined.map((r) => ({ kind: 'log', r, joined: true })),
     ...research.map((r) => ({ kind: 'research', r })),
     ...reflections.map((r) => ({ kind: 'reflection', r })),
+    ...measures.map((r) => ({ kind: 'measure', r })),
+    ...peer.map((r) => ({ kind: 'peer', r })),
+    ...asked.map((r) => ({ kind: 'request', r })),
+    ...answered.map((r) => ({ kind: 'reply', r })),
   ];
   const inArea = (a) => all.filter((x) => areasOf(x.kind, x.r).includes(a));
   const latest = (list, key) => list.map((x) => x[key]).find(Boolean);
@@ -65,12 +72,16 @@ function buildDrafts({ profile, team, plan, logs, joined, research, reflections 
   if (!jaLogs.length) jaMissing.push('회의·발표 일지나 ‘자율’ 영역으로 표시한 일지가 없어요.');
   if (!joined.length && !logs.some((l) => l.activity_type === '회의')) jaMissing.push('팀원과 함께 한 활동(같이 한 팀원 표시)이 없어요.');
   if (!teamwork) jaMissing.push('성찰의 ‘어려웠던 점과 극복’이 없어요.');
+  if (!peer.length) jaMissing.push('친구에게 받은 칭찬·조언이 없어요.');
+  const praise = peer.find((f) => f.kind === '칭찬');
   const jaText = compose([
     `${team ? `${team.name} 팀의 일원으로` : '팀의 일원으로'} 친환경 도시 모형 제작 프로젝트에 참여함.`,
     profile?.role_desc ? `팀에서 ‘${clip(profile.role_desc, 40)}’ 역할을 맡음.` : '',
     jaLogs.length ? `회의·발표 등 공동 활동 ${jaLogs.length}회${joined.length ? `, 팀원과 함께 기록한 활동 ${joined.length}회` : ''}에 참여함.` : '',
     teamwork?.hardship ? `활동 중 ‘${clip(teamwork.hardship)}’의 과정을 겪으며 문제를 함께 해결함.` : '',
     jaLogs[0] ? `대표 활동: ${shortDate(jaLogs[0].r.log_date)} ${jaLogs[0].r.activity_type} - ${clip(jaLogs[0].r.did, 60)}.` : '',
+    asked.length || answered.length ? `팀 간 요청 게시판에서 다른 팀에 ${asked.length}건을 요청하고 ${answered.length}건에 답하며 모형을 함께 맞춤.` : '',
+    praise ? `팀원에게서 ‘${clip(praise.body, 50)}’이라는 평을 받음.` : '',
     teamwork?.best ? `스스로 가장 잘한 점으로 ‘${clip(teamwork.best, 50)}’을 꼽음.` : '',
   ]);
 
@@ -83,7 +94,8 @@ function buildDrafts({ profile, team, plan, logs, joined, research, reflections 
   const dMissing = [];
   if (!plan) dMissing.push('개인 계획서(맡을 기능·탐구 질문)가 없어요.');
   if (!dLogs.some((l) => ['설계', '제작', '실험·테스트'].includes(l.activity_type))) dMissing.push('설계·제작·실험 일지가 없어요.');
-  if (!withResult) dMissing.push('‘실험 결과·측정값’을 쓴 일지가 없어요.');
+  if (!withResult && !measures.length) dMissing.push('‘실험 결과·측정값’을 쓴 일지나 측정 기록이 없어요.');
+  const bestMeasure = measures.find((m) => m.conclusion) || measures[0];
   if (!dResearch.length) dMissing.push('이론 조사 기록이 없어요.');
   const types = countBy(dLogs.filter((l) => l.activity_type !== '회의'), (l) => l.activity_type);
   const dText = compose([
@@ -92,6 +104,7 @@ function buildDrafts({ profile, team, plan, logs, joined, research, reflections 
     dResearch.length ? `관련 자료 ${dResearch.length}건(${joinCounts(countBy(dResearch, (r) => r.source_type), '건')})을 조사하여 ‘${clip(dResearch[0].application, 50)}’에 적용함.` : '',
     withProblem ? `제작 중 ‘${clip(withProblem.problem)}’의 방법으로 문제를 해결함.` : '',
     withResult ? `그 결과 ‘${clip(withResult.results, 60)}’을 확인함.` : '',
+    bestMeasure ? `‘${clip(bestMeasure.title, 40)}’을 ${bestMeasure.points.length}번 측정${bestMeasure.conclusion ? `하여 ‘${clip(bestMeasure.conclusion, 60)}’을 밝힘` : '함'}.` : '',
   ]);
 
   // 진로: 활동과 희망 진로의 연결, 생각의 변화
@@ -122,6 +135,10 @@ function evidenceItem(x) {
   const r = x.r;
   if (x.kind === 'log') return html`<li>${shortDate(r.log_date)} 일지(${r.activity_type})${x.joined ? ' · 같이 함' : ''}: ${firstLine(r.did)}</li>`;
   if (x.kind === 'research') return html`<li>${shortDate(r.created_at)} 조사(${r.source_type}): ${r.title}</li>`;
+  if (x.kind === 'measure') return html`<li>${shortDate(r.measured_on)} 측정: ${r.title} (${r.points.length}번)</li>`;
+  if (x.kind === 'peer') return html`<li>${shortDate(r.created_at)} 친구의 ${r.kind}: ${firstLine(r.body)}</li>`;
+  if (x.kind === 'request') return html`<li>${shortDate(r.created_at)} 팀 간 요청: ${r.title}</li>`;
+  if (x.kind === 'reply') return html`<li>${shortDate(r.created_at)} 다른 팀 요청에 답변: ${firstLine(r.body)}</li>`;
   return html`<li>${r.kind === '최종' ? '최종 성찰' : weekLabel(r.week_of)}: ${firstLine(r.best)}</li>`;
 }
 
@@ -136,7 +153,7 @@ export async function portfolioView(el, ctx, params) {
   const isStaff = me.role !== 'student';
   render(el, html`<section class="card"><p class="muted">기록을 모으는 중…</p></section>`);
 
-  let people, target, profile, plan, logs, joined, research, reflections;
+  let people, target, profile, plan, logs, joined, research, reflections, peer, requests, replies, measures;
   try {
     people = await fetchPeople();
     const students = [...people.values()].filter((p) => p.role === 'student');
@@ -147,13 +164,17 @@ export async function portfolioView(el, ctx, params) {
       render(el, html`<section class="card"><p class="muted">아직 학생 계정이 없어요.</p></section>`);
       return;
     }
-    [profile, plan, logs, joined, research, reflections] = await Promise.all([
+    [profile, plan, logs, joined, research, reflections, peer, requests, replies, measures] = await Promise.all([
       target.user_id === me.user_id ? me : fetchMyProfile(target.user_id),
       fetchPlan(target.user_id),
       fetchLogs({ authorId: target.user_id }),
       fetchJoinedLogs(target.user_id),
       fetchResearch({ authorId: target.user_id }),
       fetchReflections({ authorId: target.user_id }),
+      fetchPeerFeedback({ toId: target.user_id }),
+      fetchRequests(),
+      fetchReplies(),
+      fetchMeasurements({ authorId: target.user_id }),
     ]);
     joined = joined.filter((l) => l.author_id !== target.user_id);
   } catch (err) {
@@ -210,7 +231,10 @@ export async function portfolioView(el, ctx, params) {
   for (const l of chrono) for (const s of l.subjects || []) bySubject.set(s, [...(bySubject.get(s) || []), `${shortDate(l.log_date)} 일지: ${firstLine(l.did)}`]);
   for (const r of research) for (const s of r.subjects || []) bySubject.set(s, [...(bySubject.get(s) || []), `조사: ${r.title}`]);
 
-  const drafts = buildDrafts({ profile, team, plan, logs, joined, research, reflections });
+  const asked = requests.filter((r) => r.author_id === target.user_id);
+  const answered = [...replies.values()].flat().filter((a) => a.author_id === target.user_id
+    && requests.find((r) => r.id === a.request_id)?.author_id !== target.user_id);
+  const drafts = buildDrafts({ profile, team, plan, logs, joined, research, reflections, peer, asked, answered, measures });
   const report = compose([
     plan ? `[동기] ${clip(plan.motivation)}. 이를 바탕으로 ‘${clip(plan.question, 60)}’에 대해 탐구함.` : '',
     chrono.length ? `[과정] ${shortDate(chrono[0].log_date)}부터 ${chrono.length}회 활동함(${joinCounts(countBy(chrono, (l) => l.activity_type))}). ${clip(chrono[chrono.length - 1].did, 60)}.` : '',
@@ -269,7 +293,7 @@ export async function portfolioView(el, ctx, params) {
 
     <section class="card">
       <h2 class="subtitle">자율 · 동아리 · 진로 영역별 초안</h2>
-      <p class="hint">영역을 고르지 않은 기록은 종류에 따라 나눴어요. 회의·발표 일지 → 자율, 조사·설계·제작·실험 일지와 이론 조사 → 동아리, 성찰 → 진로.</p>
+      <p class="hint">영역을 고르지 않은 기록은 종류에 따라 나눴어요. 회의·발표 일지, 친구의 칭찬·조언, 팀 간 요청 → 자율 / 조사·설계·제작·실험 일지, 이론 조사, 측정 기록 → 동아리 / 성찰 → 진로.</p>
       ${drafts.map((d, i) => html`
         <div class="draft">
           <div class="title-row">
@@ -311,6 +335,9 @@ export async function portfolioView(el, ctx, params) {
       <h2 class="subtitle">숫자로 보는 활동</h2>
       <p>활동 유형: ${chrono.length ? joinCounts(countBy(chrono, (l) => l.activity_type)) : '아직 없음'}</p>
       <p>읽은 자료: ${research.length ? joinCounts(countBy(research, (r) => r.source_type), '건') : '아직 없음'}</p>
+      <p>측정 기록: ${measures.length ? `${measures.length}묶음, 측정값 ${measures.reduce((n, m) => n + m.points.length, 0)}개` : '아직 없음'}
+        · 받은 칭찬·조언 ${peer.length}개 · 팀 간 요청 ${asked.length}건 · 답변 ${answered.length}건</p>
+      ${measures.length ? html`<h4>측정 기록장</h4><ul class="evidence">${measures.slice(0, 6).map((m) => html`<li>${shortDate(m.measured_on)} ${m.title}: ${m.points.map((p) => `${p.x}→${p.y}${m.unit || ''}`).slice(0, 5).join(', ')}${m.points.length > 5 ? ' …' : ''}</li>`)}</ul>` : ''}
       ${numberLines.length ? html`<h4>측정·숫자 기록</h4><ul class="evidence">${numberLines.map((n) => html`<li>${shortDate(n.day)} ${n.s}</li>`)}</ul>`
         : html`<p class="muted">일지의 ‘실험 결과·측정값’에 숫자를 쓰면 여기에 모여요.</p>`}
     </section>

@@ -1,5 +1,5 @@
 import { html, render, toast, setBusy } from '../ui.js';
-import { fetchPlan, fetchResearch, fetchLogs, fetchJoinedLogs, fetchReflections, fetchPeople, personName, kstDay, weekLabel } from '../records.js';
+import { fetchPlan, fetchResearch, fetchLogs, fetchJoinedLogs, fetchReflections, fetchPeople, fetchMeasurements, personName, kstDay, weekLabel } from '../records.js';
 import { toCsv, download, fetchAll } from '../export.js';
 import { planCard, logCard, researchCard, reflectionCard } from './cards.js';
 
@@ -9,7 +9,8 @@ const TABLES = [
   ['plans', '계획서'], ['activity_logs', '활동 일지'], ['log_participants', '같이 한 팀원'], ['research_notes', '이론 조사'],
   ['reflections', '성찰'], ['comments', '피드백 댓글'], ['tasks', '할 일'], ['purchase_requests', '물품 신청'],
   ['notices', '공지'], ['schedule_events', '통합 일정'], ['integration_checks', '통합 테스트'], ['role_assignments', '역할 분담'],
-  ['role_history', '역할 변경 이력'], ['log_photos', '사진 목록'], ['app_settings', '설정'],
+  ['role_history', '역할 변경 이력'], ['features', '기능 구현 현황'], ['measurements', '측정 기록'],
+  ['peer_feedback', '팀원 상호 피드백'], ['team_requests', '팀 간 요청'], ['request_replies', '요청 답변'], ['log_photos', '사진 목록'], ['app_settings', '설정'],
 ];
 
 const LOG_COLS = [['log_date', '날짜'], ['minutes', '활동 시간(분)'], ['activity_type', '활동 유형'], ['did', '한 일'], ['problem', '문제와 해결'],
@@ -34,6 +35,7 @@ export async function backupView(el, ctx) {
           <button type="button" class="secondary" data-mine="logs">📒 활동 일지 (엑셀)</button>
           <button type="button" class="secondary" data-mine="research">📚 이론 조사 (엑셀)</button>
           <button type="button" class="secondary" data-mine="reflections">🪞 성찰 (엑셀)</button>
+          <button type="button" class="secondary" data-mine="measures">📈 측정 기록 (엑셀)</button>
           <button type="button" class="primary" id="bk-print">🖨 모든 기록 인쇄·PDF</button>
         </div>
       </section>`}
@@ -64,6 +66,10 @@ export async function backupView(el, ctx) {
           download(`eco-logs_${me.login_id}_${day}.csv`, toCsv(rows, [['who', '구분'], ...LOG_COLS]));
         } else if (kind === 'research') {
           download(`eco-research_${me.login_id}_${day}.csv`, toCsv(await fetchResearch({ authorId: me.user_id }), RESEARCH_COLS));
+        } else if (kind === 'measures') {
+          const rows = (await fetchMeasurements({ authorId: me.user_id })).flatMap((m) => m.points.map((p) => ({ ...m, px: p.x, py: p.y, pn: p.note })));
+          download(`eco-measurements_${me.login_id}_${day}.csv`, toCsv(rows, [['measured_on', '측정한 날'], ['title', '측정 이름'], ['x_label', '가로축'],
+            ['px', '가로축 값'], ['y_label', '측정한 것'], ['py', '측정값'], ['unit', '단위'], ['pn', '메모'], ['conclusion', '결과 해석']]));
         } else {
           download(`eco-reflections_${me.login_id}_${day}.csv`, toCsv(await fetchReflections({ authorId: me.user_id }), REFL_COLS));
         }

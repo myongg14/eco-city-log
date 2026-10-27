@@ -245,13 +245,16 @@ export async function fetchRoleHistory() {
 // 사이트 안 알림. 마지막으로 알림을 확인한 뒤에 생긴 것은 new 로 표시해요.
 export async function fetchAlerts(me) {
   const isStudent = me.role === 'student';
-  const [seenRows, tasks, purchases, events, checks, comments] = await Promise.all([
+  const [seenRows, tasks, purchases, events, checks, comments, peer, requests, replies] = await Promise.all([
     run(sb.from('notification_seen').select('seen_at').eq('user_id', me.user_id)),
     isStudent ? fetchTasks({ assigneeId: me.user_id }) : [],
     fetchPurchases(),
     fetchEvents(),
     fetchChecks(),
     isStudent ? run(sb.from('comments').select('*').eq('target_author', me.user_id).order('created_at', { ascending: false })) : [],
+    isStudent ? run(sb.from('peer_feedback').select('*').eq('to_id', me.user_id)) : [],
+    run(sb.from('team_requests').select('*')),
+    run(sb.from('request_replies').select('*')),
   ]);
   const since = seenRows[0]?.seen_at ? new Date(seenRows[0].seen_at) : new Date(0);
   const isNew = (t) => !!t && new Date(t) > since;
@@ -263,6 +266,20 @@ export async function fetchAlerts(me) {
   for (const c of comments) {
     if (c.author_id === me.user_id) continue;
     push({ icon: '💬', kind: '피드백', text: c.body, when: c.created_at, href: '#/records' });
+  }
+  for (const f of peer) {
+    push({ icon: f.kind === '칭찬' ? '👏' : '💡', kind: `친구의 ${f.kind}`, text: f.body, when: f.created_at, href: '#/records' });
+  }
+  for (const r of requests) {
+    if (r.status !== '열림') continue;
+    if (isStudent && r.to_team === me.team_id) {
+      push({ icon: '📮', kind: '우리 팀이 받은 요청', text: r.title, when: r.created_at, href: '#/requests?f=to' });
+    }
+  }
+  for (const a of replies) {
+    const r = requests.find((x) => x.id === a.request_id);
+    if (!r || a.author_id === me.user_id || r.author_id !== me.user_id) continue;
+    push({ icon: '📮', kind: '내 요청에 답변', text: `${r.title} · ${a.body}`, when: a.created_at, href: '#/requests?f=from' });
   }
   for (const t of tasks) {
     if (t.status === '완료') continue;
@@ -298,4 +315,47 @@ export async function fetchAlerts(me) {
   }
   out.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || (b.when || '').localeCompare(a.when || ''));
   return { list: out, newCount: out.filter((a) => a.isNew).length };
+}
+
+// ---------------------------------------------------------------------
+// 5-2단계: 기능 구현 현황, 실험·측정, 팀원 상호 피드백, 팀 간 요청
+// ---------------------------------------------------------------------
+
+export const FEATURE_STAGES = ['설계', '부품 확보', '제작', '작동 확인'];
+
+// 단계를 진행률(%)로: 설계 25 → 작동 확인 100
+export function stagePercent(stage) {
+  return (FEATURE_STAGES.indexOf(stage) + 1) * 25;
+}
+
+export async function fetchFeatures() {
+  return run(sb.from('features').select('*').order('team_id').order('sort_order').order('id'));
+}
+
+export async function fetchMeasurements({ authorId, id } = {}) {
+  let q = sb.from('measurements').select('*');
+  if (authorId) q = q.eq('author_id', authorId);
+  if (id) q = q.eq('id', id);
+  return run(q.order('measured_on', { ascending: false }).order('id', { ascending: false }));
+}
+
+export async function fetchPeerFeedback({ toId } = {}) {
+  let q = sb.from('peer_feedback').select('*');
+  if (toId) q = q.eq('to_id', toId);
+  return run(q.order('created_at', { ascending: false }));
+}
+
+export async function fetchRequests() {
+  return run(sb.from('team_requests').select('*').order('created_at', { ascending: false }));
+}
+
+// request_id → [답변] Map
+export async function fetchReplies() {
+  const rows = await run(sb.from('request_replies').select('*').order('created_at'));
+  const map = new Map();
+  for (const r of rows) {
+    if (!map.has(r.request_id)) map.set(r.request_id, []);
+    map.get(r.request_id).push(r);
+  }
+  return map;
 }

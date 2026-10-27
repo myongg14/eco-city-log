@@ -23,6 +23,9 @@ import { backupView } from './views/backup.js';
 import { scheduleView } from './views/schedule.js';
 import { rolesView } from './views/roles.js';
 import { alertsView } from './views/alerts.js';
+import { progressView } from './views/progress.js';
+import { measureView, measureFormView } from './views/measure.js';
+import { requestsView } from './views/requests.js';
 import { fetchAlerts } from './records.js';
 
 const state = {
@@ -97,9 +100,10 @@ function renderNav(current) {
     { path: '/alerts', label: '🔔 알림' },
     { path: '/records', label: isStaff() ? '학생 기록' : '내 기록', also: '/reflection/' },
     { path: '/portfolio', label: '생기부' },
-    { path: '/teams', label: '팀', also: '/team/', also2: '/roles' },
+    { path: '/teams', label: '팀', also: '/team/', also2: ['/roles', '/progress', '/requests'] },
     { path: '/schedule', label: '일정' },
     { path: '/tasks', label: '할 일' },
+    { path: '/measure', label: '측정' },
     { path: '/supplies', label: '물품' },
     { path: '/gallery', label: '갤러리' },
     { path: '/library', label: '자료실' },
@@ -110,7 +114,7 @@ function renderNav(current) {
   if (isStaff()) links.push({ path: '/admin', label: '관리' });
   navEl.hidden = false;
   render(navEl, html`
-    ${links.map((l) => html`<a href="#${l.path}" class="${current.startsWith(l.path) || (l.also && current.startsWith(l.also)) || (l.also2 && current.startsWith(l.also2)) ? 'active' : ''}">${l.label}</a>`)}
+    ${links.map((l) => html`<a href="#${l.path}" class="${current.startsWith(l.path) || (l.also && current.startsWith(l.also)) || (l.also2 && l.also2.some((p) => current.startsWith(p))) ? 'active' : ''}">${l.label}</a>`)}
     <button type="button" class="link-button" id="logout-btn">로그아웃</button>
   `);
   navEl.querySelector('#logout-btn').addEventListener('click', logout);
@@ -155,6 +159,7 @@ function renderFab(show) {
     <div class="fab-menu" hidden>
       <a href="#/log/new">📒 활동 일지</a>
       <a href="#/research/new">📚 이론 조사</a>
+      <a href="#/measure/new">📈 측정 기록</a>
       <a href="#/reflection/new">🪞 이번 주 성찰</a>
       <a href="#/plan">📝 개인 계획서</a>
       <a href="#/supplies/new">🛒 물품 신청</a>
@@ -207,6 +212,8 @@ async function route() {
   }
   const refl = path.match(/^\/reflection\/(new|\d+)$/);
   if (refl) return isStudent ? reflectionFormView(appEl, ctx, refl[1] === 'new' ? null : refl[1], params) : go('/records');
+  const measure = path.match(/^\/measure\/(new|\d+)$/);
+  if (measure) return isStudent ? measureFormView(appEl, ctx, measure[1] === 'new' ? null : measure[1]) : go('/measure');
   const purchase = path.match(/^\/supplies\/(new|\d+)$/);
   if (purchase) return purchaseFormView(appEl, ctx, purchase[1] === 'new' ? null : purchase[1]);
   const teamPage = path.match(/^\/team\/(\d+)$/);
@@ -230,6 +237,12 @@ async function route() {
       return alertsView(appEl, ctx);
     case '/schedule':
       return scheduleView(appEl, ctx, params);
+    case '/progress':
+      return progressView(appEl, ctx, params);
+    case '/measure':
+      return measureView(appEl, ctx, params);
+    case '/requests':
+      return requestsView(appEl, ctx, params);
     case '/roles':
       return rolesView(appEl, ctx, params);
     case '/portfolio':

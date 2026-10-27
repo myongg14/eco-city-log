@@ -3,7 +3,8 @@ import { fetchPeople, fetchTasks, fetchPurchases, fetchResearch, fetchLogs, pers
 import { sb, friendlyError } from '../api.js';
 import { taskCard } from './tasks.js';
 import { roleTable, historyList } from './roles.js';
-import { fetchRoles, fetchRoleHistory } from '../records.js';
+import { fetchRoles, fetchRoleHistory, fetchFeatures, fetchRequests } from '../records.js';
+import { featureCard, bindFeatureButtons, teamPercent } from './progress.js';
 
 function progress(tasks) {
   if (!tasks.length) return null;
@@ -17,10 +18,10 @@ function bar(pct) {
 async function loadAll() {
   const plans = await sb.from('plans').select('user_id');
   if (plans.error) throw new Error(friendlyError(plans.error));
-  const [people, tasks, purchases, research, logs, roles, history] = await Promise.all([
-    fetchPeople(), fetchTasks(), fetchPurchases(), fetchResearch(), fetchLogs(), fetchRoles(), fetchRoleHistory(),
+  const [people, tasks, purchases, research, logs, roles, history, features, requests] = await Promise.all([
+    fetchPeople(), fetchTasks(), fetchPurchases(), fetchResearch(), fetchLogs(), fetchRoles(), fetchRoleHistory(), fetchFeatures(), fetchRequests(),
   ]);
-  return { people, tasks, purchases, research, logs, roles, history, planned: new Set(plans.data.map((p) => p.user_id)) };
+  return { people, tasks, purchases, research, logs, roles, history, features, requests, planned: new Set(plans.data.map((p) => p.user_id)) };
 }
 
 // 팀 목록: 팀별 진행률, 기록 수, 쓴 예산
@@ -38,7 +39,12 @@ export async function teamsView(el, ctx) {
     <section class="card">
       <h1 class="title">팀</h1>
       <p class="muted">팀을 누르면 팀원, 역할, 할 일, 최근 기록, 쓴 예산을 볼 수 있어요. 진행률은 할 일 보드에서 완료한 비율이에요.</p>
-      <div class="title-actions"><a class="secondary" href="#/roles">👥 전체 역할 분담</a><a class="secondary" href="#/schedule">📅 통합 일정</a></div>
+      <div class="title-actions">
+        <a class="secondary" href="#/progress">🏙 기능 구현 현황</a>
+        <a class="secondary" href="#/requests">📮 팀 간 요청</a>
+        <a class="secondary" href="#/roles">👥 전체 역할 분담</a>
+        <a class="secondary" href="#/schedule">📅 통합 일정</a>
+      </div>
     </section>
     <div class="team-grid">
       ${teams.map((t) => {
@@ -51,7 +57,8 @@ export async function teamsView(el, ctx) {
             <strong>${t.name}</strong>
             ${t.topic ? html`<span class="muted small">${t.topic}</span>` : ''}
             ${bar(pct)}
-            <span class="muted small">진행률 ${pct === null ? '할 일 없음' : `${pct}%`} · 팀원 ${members.length}명</span>
+            <span class="muted small">할 일 진행률 ${pct === null ? '할 일 없음' : `${pct}%`} · 팀원 ${members.length}명</span>
+            <span class="muted small">기능 구현 ${(() => { const fp = teamPercent(d.features.filter((f) => f.team_id === t.id)); return fp === null ? '-' : `${fp}%`; })()}</span>
             <span class="muted small">일지 ${d.logs.filter((l) => l.team_id === t.id).length} · 조사 ${d.research.filter((r) => r.team_id === t.id).length} · 쓴 예산 ${won(spent)}</span>
           </a>`;
       })}
@@ -79,6 +86,8 @@ export async function teamView(el, ctx, teamId) {
   const members = [...d.people.values()].filter((p) => p.team_id === team.id && p.role === 'student');
   const tasks = d.tasks.filter((t) => t.team_id === team.id);
   const pct = progress(tasks);
+  const teamFeatures = d.features.filter((f) => f.team_id === team.id);
+  const openRequests = d.requests.filter((r) => r.to_team === team.id && r.status === '열림');
   const purchases = d.purchases.filter((p) => p.team_id === team.id);
   const spent = purchases.filter((p) => SPENT_STATUSES.includes(p.status)).reduce((s, p) => s + p.total_price, 0);
   const recent = [
@@ -113,6 +122,19 @@ export async function teamView(el, ctx, teamId) {
     </section>
 
     <section class="card">
+      <div class="title-row"><h2 class="subtitle">기능 구현 현황</h2><a class="link small" href="#/progress">전체 현황</a></div>
+      ${teamFeatures.length ? html`<div class="feature-list" id="team-features">${teamFeatures.map((f) => featureCard(f, { people: d.people, canEdit: me.role !== 'student' || me.team_id === team.id }))}</div>`
+        : html`<p class="muted">아직 등록한 기능이 없어요. <a class="link" href="#/progress">기능 추가하기</a></p>`}
+    </section>
+
+    ${openRequests.length ? html`
+      <section class="card">
+        <div class="title-row"><h2 class="subtitle">우리 팀이 받은 요청</h2><a class="link small" href="#/requests">요청 게시판</a></div>
+        <ul class="recent">${openRequests.map((r) => html`<li><span class="badge warn">열림</span><span class="recent-text">${r.title}</span>
+          <span class="muted small">${teams.find((t) => t.id === r.from_team)?.name || ''}</span></li>`)}</ul>
+      </section>` : ''}
+
+    <section class="card">
       <div class="title-row"><h2 class="subtitle">역할 분담</h2><a class="link small" href="#/roles">전체 역할 분담</a></div>
       ${roleTable(d.roles.filter((r) => members.some((p) => p.user_id === r.user_id)), { people: d.people })}
       ${d.history.some((h) => members.some((p) => p.user_id === h.user_id)) ? html`
@@ -143,4 +165,6 @@ export async function teamView(el, ctx, teamId) {
         </ul>` : html`<p class="muted">신청한 물품이 없어요.</p>`}
     </section>
   `);
+  const tf = el.querySelector('#team-features');
+  if (tf) bindFeatureButtons(tf, teamFeatures, () => teamView(el, ctx, teamId));
 }
