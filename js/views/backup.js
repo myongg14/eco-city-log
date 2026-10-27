@@ -10,7 +10,7 @@ const TABLES = [
   ['reflections', '성찰'], ['comments', '피드백 댓글'], ['tasks', '할 일'], ['purchase_requests', '물품 신청'],
   ['notices', '공지'], ['schedule_events', '통합 일정'], ['integration_checks', '통합 테스트'], ['role_assignments', '역할 분담'],
   ['role_history', '역할 변경 이력'], ['features', '기능 구현 현황'], ['measurements', '측정 기록'],
-  ['peer_feedback', '팀원 상호 피드백'], ['team_requests', '팀 간 요청'], ['request_replies', '요청 답변'], ['log_photos', '사진 목록'], ['app_settings', '설정'],
+  ['peer_feedback', '팀원 상호 피드백'], ['team_requests', '팀 간 요청'], ['request_replies', '요청 답변'], ['team_links', '팀 간 연결'], ['showcase_items', '공개 항목'], ['log_photos', '사진 목록'], ['app_settings', '설정'],
 ];
 
 const LOG_COLS = [['log_date', '날짜'], ['minutes', '활동 시간(분)'], ['activity_type', '활동 유형'], ['did', '한 일'], ['problem', '문제와 해결'],

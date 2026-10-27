@@ -41,9 +41,11 @@ export async function teamsView(el, ctx) {
       <p class="muted">팀을 누르면 팀원, 역할, 할 일, 최근 기록, 쓴 예산을 볼 수 있어요. 진행률은 할 일 보드에서 완료한 비율이에요.</p>
       <div class="title-actions">
         <a class="secondary" href="#/progress">🏙 기능 구현 현황</a>
+        <a class="secondary" href="#/links">🔗 팀 간 연결 지도</a>
         <a class="secondary" href="#/requests">📮 팀 간 요청</a>
         <a class="secondary" href="#/roles">👥 전체 역할 분담</a>
         <a class="secondary" href="#/schedule">📅 통합 일정</a>
+        <a class="secondary" href="#/present">🎤 발표 자료</a>
       </div>
     </section>
     <div class="team-grid">

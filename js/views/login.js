@@ -17,6 +17,7 @@ export function loginView(el, ctx) {
       </form>
       <p class="hint">처음 로그인할 때 비밀번호는 <strong>${INITIAL_PASSWORD}</strong> 이고, 로그인하면 바로 새 비밀번호로 바꿔야 해요.
         비밀번호를 잊었으면 관리자에게 초기화를 부탁하세요.</p>
+      <p class="hint"><a class="link" href="#/showcase">로그인 없이 프로젝트 소개 보기</a></p>
     </section>
   `);
 

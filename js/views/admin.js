@@ -25,6 +25,14 @@ export async function adminView(el, ctx) {
 
     <section class="card">
       <div class="title-row">
+        <h2 class="subtitle">🌐 외부 공개 페이지</h2>
+        <a class="secondary" href="#/showcase/settings">설정</a>
+      </div>
+      <p class="muted">로그인 없이 보는 프로젝트 소개 화면을 켜고 끄고, 공개할 측정 기록과 사진을 골라요. 학생 이름은 나오지 않아요.</p>
+    </section>
+
+    <section class="card">
+      <div class="title-row">
         <h2 class="subtitle">💾 전체 백업</h2>
         <a class="secondary" href="#/backup">백업 화면으로</a>
       </div>

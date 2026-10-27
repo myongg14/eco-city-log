@@ -5,12 +5,6 @@ import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchNotices, fetchTa
 import { noticeBoard } from './notices.js';
 import { taskCard } from './tasks.js';
 
-// 다음 단계에 열릴 메뉴들. 열리면 이 목록에서 빼고 nav 에 넣습니다.
-const UPCOMING = [
-  { title: '발표 자료 내보내기', desc: '개요, 갤러리, 측정 결과를 발표용 한 페이지로 모아요.' },
-  { title: '외부 공개 페이지', desc: '로그인 없이 보는 프로젝트 소개 화면 (학생 이름은 가림).' },
-];
-
 function daysLeft() {
   const end = new Date(`${PROJECT_DEADLINE}T23:59:59+09:00`);
   return Math.ceil((end - Date.now()) / 86400000);
@@ -44,12 +38,6 @@ export async function homeView(el, ctx) {
       ${team?.topic ? html`<p class="hint">우리 팀 주제: ${team.topic}</p>` : ''}
     </section>
     ${extra || html`<section class="card"><p class="muted">기록을 불러오는 중…</p></section>`}
-    <section class="card">
-      <h2 class="subtitle">곧 열려요</h2>
-      <ul class="upcoming">
-        ${UPCOMING.map((m) => html`<li><strong>${m.title}</strong><span class="muted">${m.desc}</span></li>`)}
-      </ul>
-    </section>
   `);
   draw();
 

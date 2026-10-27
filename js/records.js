@@ -359,3 +359,21 @@ export async function fetchReplies() {
   }
   return map;
 }
+
+export async function fetchLinks() {
+  return run(sb.from('team_links').select('*').order('id'));
+}
+
+// 외부 공개 페이지 설정 { enabled, intro } (관리자·선생님 화면에서 씀)
+export async function fetchShowcaseSettings() {
+  const rows = await run(sb.from('app_settings').select('key, value').eq('key', 'showcase'));
+  return { enabled: false, intro: '', ...(rows[0]?.value || {}) };
+}
+
+// 공개하기로 고른 항목: { measurement: Set<id>, photo: Set<id> }
+export async function fetchShowcaseItems() {
+  const rows = await run(sb.from('showcase_items').select('kind, ref_id'));
+  const picked = { measurement: new Set(), photo: new Set() };
+  for (const r of rows) picked[r.kind]?.add(Number(r.ref_id));
+  return picked;
+}

@@ -26,6 +26,9 @@ import { alertsView } from './views/alerts.js';
 import { progressView } from './views/progress.js';
 import { measureView, measureFormView } from './views/measure.js';
 import { requestsView } from './views/requests.js';
+import { linksView } from './views/links.js';
+import { presentView } from './views/present.js';
+import { showcaseView, showcaseSettingsView } from './views/showcase.js';
 import { fetchAlerts } from './records.js';
 
 const state = {
@@ -100,7 +103,7 @@ function renderNav(current) {
     { path: '/alerts', label: '🔔 알림' },
     { path: '/records', label: isStaff() ? '학생 기록' : '내 기록', also: '/reflection/' },
     { path: '/portfolio', label: '생기부' },
-    { path: '/teams', label: '팀', also: '/team/', also2: ['/roles', '/progress', '/requests'] },
+    { path: '/teams', label: '팀', also: '/team/', also2: ['/roles', '/progress', '/requests', '/links', '/present'] },
     { path: '/schedule', label: '일정' },
     { path: '/tasks', label: '할 일' },
     { path: '/measure', label: '측정' },
@@ -188,6 +191,12 @@ async function route() {
   const path = rawPath || '/home';
   const params = new URLSearchParams(query);
 
+  // 외부 공개 페이지는 로그인하지 않아도 봐요.
+  if (path === '/showcase') {
+    renderNav(path);
+    window.scrollTo(0, 0);
+    return showcaseView(appEl, ctx);
+  }
   if (!state.session) {
     renderNav('/login');
     return loginView(appEl, ctx);
@@ -243,6 +252,12 @@ async function route() {
       return measureView(appEl, ctx, params);
     case '/requests':
       return requestsView(appEl, ctx, params);
+    case '/links':
+      return linksView(appEl, ctx);
+    case '/present':
+      return presentView(appEl, ctx, params);
+    case '/showcase/settings':
+      return isStaff() ? showcaseSettingsView(appEl, ctx) : go('/home');
     case '/roles':
       return rolesView(appEl, ctx, params);
     case '/portfolio':
