@@ -1,7 +1,7 @@
 import { rpc } from '../api.js';
 import { html, render, showMessage, setBusy, toast } from '../ui.js';
-import { fetchResearch, SOURCE_TYPES, AREAS } from '../records.js';
-import { field, selectField, checkGroup, checkedValues, bindVagueHints } from '../form.js';
+import { fetchResearch, SOURCE_TYPES, AREAS, SUBJECTS } from '../records.js';
+import { field, selectField, checkGroup, checkedValues, bindVagueHints, saveSubjects } from '../form.js';
 
 // id 가 없으면 새로 쓰기
 export async function researchFormView(el, ctx, id) {
@@ -44,6 +44,8 @@ export async function researchFormView(el, ctx, id) {
           options: [5, 4, 3, 2, 1].map((n) => ({ value: n, label: `${'★'.repeat(n)}${'☆'.repeat(5 - n)} (${n}점)` })),
           hint: '공공기관·논문은 높게, 개인 블로그는 낮게 줘요.' })}
         ${checkGroup({ name: 'areas', label: '생기부 영역 (고르지 않아도 돼요)', options: AREAS, values: note.areas })}
+        ${checkGroup({ name: 'subjects', label: '연계 교과 (고르지 않아도 돼요)', options: SUBJECTS, values: note.subjects,
+          hint: '이 활동에서 쓴 교과 지식을 고르면 생기부 정리에서 교과별로 모여요.' })}
         <p class="message" id="rs-msg" hidden></p>
         <button type="submit" class="primary" id="rs-btn">저장</button>
       </form>
@@ -84,7 +86,8 @@ export async function researchFormView(el, ctx, id) {
 
     setBusy(btn, true, '저장 중…');
     try {
-      await rpc('save_research', { p_id: id ? Number(id) : null, p_data: data });
+      const savedId = await rpc('save_research', { p_id: id ? Number(id) : null, p_data: data });
+      await saveSubjects('research', savedId, checkedValues(form, 'subjects'), note.subjects);
       toast(id ? '조사 기록을 고쳤어요.' : '조사 기록을 저장했어요.');
       ctx.go('/records');
     } catch (err) {

@@ -1,9 +1,13 @@
 // 기록 카드 그리기 (내 기록, 자료실, 홈에서 같이 씀)
 import { html } from '../ui.js';
-import { personName, formatDate, shortDate } from '../records.js';
+import { personName, formatDate, shortDate, weekLabel } from '../records.js';
+import { commentBlock } from './comments.js';
 
-function areaBadges(areas) {
-  return (areas || []).map((a) => html`<span class="badge area">${a}</span>`);
+function areaBadges(areas, subjects) {
+  return [
+    ...(areas || []).map((a) => html`<span class="badge area">${a}</span>`),
+    ...(subjects || []).map((s) => html`<span class="badge subject">${s}</span>`),
+  ];
 }
 
 function para(label, text) {
@@ -31,7 +35,8 @@ function ownerActions(kind, r, isMine) {
     </div>`;
 }
 
-export function researchCard(r, { people, teams, meId, showAuthor = true }) {
+export function researchCard(r, cardCtx) {
+  const { people, teams, meId, showAuthor = true } = cardCtx;
   const team = teams.find((t) => t.id === r.team_id);
   const source = [r.source_author, r.source_publisher, r.source_year].filter(Boolean).join(', ');
   return html`
@@ -39,7 +44,7 @@ export function researchCard(r, { people, teams, meId, showAuthor = true }) {
       <div class="rec-head">
         <span class="badge kind-research">이론 조사</span>
         <span class="badge">${r.source_type}</span>
-        ${areaBadges(r.areas)}
+        ${areaBadges(r.areas, r.subjects)}
         <span class="rec-date">${formatDate(r.created_at)}</span>
       </div>
       <h3 class="rec-title">${r.title}</h3>
@@ -57,6 +62,7 @@ export function researchCard(r, { people, teams, meId, showAuthor = true }) {
         <p class="hint">처음 쓴 날 ${shortDate(r.created_at)}${edited(r)}</p>
       </details>
       ${ownerActions('research', r, r.author_id === meId)}
+      ${commentBlock('research', r, cardCtx)}
     </article>`;
 }
 
@@ -67,7 +73,8 @@ function thumbs(photos, urls) {
     : ''))}</div>`;
 }
 
-export function logCard(l, { people, teams, meId, participants, photos, urls, showAuthor = true }) {
+export function logCard(l, cardCtx) {
+  const { people, teams, meId, participants, photos, urls, showAuthor = true } = cardCtx;
   const team = teams.find((t) => t.id === l.team_id);
   const with_ = (participants?.get(l.id) || []).map((u) => personName(people, u));
   const firstLine = String(l.did || '').split('\n')[0];
@@ -76,7 +83,7 @@ export function logCard(l, { people, teams, meId, participants, photos, urls, sh
       <div class="rec-head">
         <span class="badge kind-log">활동 일지</span>
         <span class="badge">${l.activity_type}</span>
-        ${areaBadges(l.areas)}
+        ${areaBadges(l.areas, l.subjects)}
         <span class="rec-date">${formatDate(l.log_date)} · ${l.minutes}분</span>
       </div>
       <h3 class="rec-title">${firstLine.length > 60 ? `${firstLine.slice(0, 60)}…` : firstLine}</h3>
@@ -94,6 +101,30 @@ export function logCard(l, { people, teams, meId, participants, photos, urls, sh
         <p class="hint">처음 쓴 날 ${shortDate(l.created_at)}${edited(l)}</p>
       </details>
       ${ownerActions('log', l, l.author_id === meId)}
+      ${commentBlock('log', l, cardCtx)}
+    </article>`;
+}
+
+export function reflectionCard(r, cardCtx) {
+  const { meId } = cardCtx;
+  return html`
+    <article class="rec" data-kind="reflection">
+      <div class="rec-head">
+        <span class="badge kind-reflection">${r.kind === '최종' ? '최종 성찰' : '주간 성찰'}</span>
+        ${(r.competencies || []).map((c) => html`<span class="badge">${c}</span>`)}
+        <span class="rec-date">${r.kind === '최종' ? formatDate(r.created_at) : weekLabel(r.week_of)}</span>
+      </div>
+      <h3 class="rec-title">${r.best}</h3>
+      <details>
+        <summary>내용 보기</summary>
+        ${para('어려웠던 점과 극복', r.hardship)}
+        ${para('새로 배운 것', r.learned)}
+        ${para('생각이 바뀐 점', r.changed)}
+        ${para('다음에 해 볼 탐구', r.next_inquiry)}
+        <p class="hint">처음 쓴 날 ${shortDate(r.created_at)}${edited(r)}</p>
+      </details>
+      ${ownerActions('reflection', r, r.author_id === meId)}
+      ${commentBlock('reflection', r, cardCtx)}
     </article>`;
 }
 

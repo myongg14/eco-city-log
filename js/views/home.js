@@ -1,14 +1,15 @@
 import { html, render, formatDateTime } from '../ui.js';
 import { PROJECT_DEADLINE } from '../config.js';
-import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchNotices, fetchTasks, fetchPurchases, fetchBudget, budgetSummary, personName, formatDate, won } from '../records.js';
+import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchNotices, fetchTasks, fetchPurchases, fetchBudget, budgetSummary, personName, formatDate, won,
+  fetchReflections, fetchUnreadComments, weekMonday } from '../records.js';
 import { noticeBoard } from './notices.js';
 import { taskCard } from './tasks.js';
 
 // 다음 단계에 열릴 메뉴들. 열리면 이 목록에서 빼고 nav 에 넣습니다.
 const UPCOMING = [
-  { title: '성찰', desc: '매주 잘한 점, 어려웠던 점, 새로 배운 것을 돌아봐요.' },
-  { title: '생기부 정리', desc: '내 기록을 자율·동아리·진로 영역별로 모아 초안을 만들어요.' },
-  { title: '선생님 피드백·검색·백업', desc: '선생님 댓글, 모든 기록 한 번에 찾기, 내 기록 내려받기.' },
+  { title: '통합 일정·통합 테스트', desc: '모든 팀의 마감과 모형을 합치는 날을 한 달력에, 통합 테스트 체크리스트.' },
+  { title: '기능 구현 현황·측정 기록장', desc: '친환경 기능별 진행 단계와 측정값 그래프.' },
+  { title: '팀원 상호 피드백·팀 간 요청', desc: '서로의 기여를 한 줄씩 칭찬하고, 다른 팀에 사양을 묻는 게시판.' },
 ];
 
 function daysLeft() {
@@ -54,7 +55,7 @@ export async function homeView(el, ctx) {
   draw();
 
   try {
-    const [notices, tasks, purchases, total, people, plan, myResearch, myLogs, recentResearch, recentLogs] = await Promise.all([
+    const [notices, tasks, purchases, total, people, plan, myResearch, myLogs, recentResearch, recentLogs, myRefl, unread] = await Promise.all([
       fetchNotices({ limit: 5 }),
       fetchTasks(),
       fetchPurchases(),
@@ -65,7 +66,10 @@ export async function homeView(el, ctx) {
       isStudent ? fetchLogs({ authorId: me.user_id }) : [],
       fetchResearch({ limit: 5 }),
       fetchLogs({ limit: 5 }),
+      isStudent ? fetchReflections({ authorId: me.user_id }) : [],
+      isStudent ? fetchUnreadComments(me.user_id) : [],
     ]);
+    const thisWeekDone = myRefl.some((r) => r.kind === '주간' && r.week_of === weekMonday());
     const recent = [
       ...recentResearch.map((r) => ({ when: r.created_at, kind: '이론 조사', text: r.title, who: r.author_id, team: r.team_id })),
       ...recentLogs.map((l) => ({ when: l.created_at, kind: `일지 · ${l.activity_type}`, text: String(l.did).split('\n')[0], who: l.author_id, team: l.team_id })),
@@ -80,6 +84,12 @@ export async function homeView(el, ctx) {
     const b = budgetSummary(total, purchases);
 
     draw(html`
+      ${unread.length ? html`
+        <section class="card feedback-alert">
+          <div class="title-row"><h2 class="subtitle">💬 새 피드백 ${unread.length}개</h2><a class="link small" href="#/records">내 기록에서 보기</a></div>
+          <ul class="recent">${unread.slice(0, 3).map((c) => html`<li><span class="recent-text">${c.body.length > 60 ? `${c.body.slice(0, 60)}…` : c.body}</span>
+            <span class="muted small">${people.get(c.author_id)?.role === 'teacher' ? '선생님' : personName(people, c.author_id)}</span></li>`)}</ul>
+        </section>` : ''}
       <section class="card">
         <div class="title-row"><h2 class="subtitle">${isStudent ? '이번 주 내 할 일' : '이번 주 할 일'}</h2><a class="link small" href="#/tasks">할 일 보드</a></div>
         ${soon.length ? html`<div class="timeline">${soon.map((t) => taskCard(t, { people, teams, me, compact: true }))}</div>`
@@ -99,6 +109,9 @@ export async function homeView(el, ctx) {
             </a>
             <a class="quick-item" href="#/log/new"><strong>📒 일지 ${myLogs.length}개</strong><span class="muted">＋ 오늘 활동 쓰기</span></a>
             <a class="quick-item" href="#/research/new"><strong>📚 조사 ${myResearch.length}개</strong><span class="muted">＋ 자료 기록하기</span></a>
+            <a class="quick-item ${thisWeekDone ? 'done' : 'todo'}" href="#/${thisWeekDone ? 'records?f=reflection' : 'reflection/new'}">
+              <strong>${thisWeekDone ? '✓ 이번 주 성찰' : '🪞 이번 주 성찰'}</strong><span class="muted">${thisWeekDone ? '작성 완료' : '일주일에 한 번'}</span></a>
+            <a class="quick-item" href="#/portfolio"><strong>📑 생기부 정리</strong><span class="muted">영역별 초안 보기</span></a>
           </div>
         </section>` : ''}
       <section class="card">

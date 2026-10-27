@@ -1,5 +1,6 @@
 // 기록 양식에서 같이 쓰는 입력칸 만들기
 import { html, raw } from './ui.js';
+import { rpc } from './api.js';
 import { findVague } from './records.js';
 
 let seq = 0;
@@ -71,4 +72,10 @@ export function bindVagueHints(root) {
     ta.addEventListener('input', check);
     check();
   });
+}
+
+// 교과 연계 태그는 기록을 저장한 다음 따로 붙여요. 바뀐 게 없으면 건너뛰어요.
+export async function saveSubjects(kind, id, chosen, before = []) {
+  if (chosen.join('|') === (before || []).join('|')) return;
+  await rpc('set_record_subjects', { p_kind: kind, p_id: Number(id), p_subjects: chosen });
 }

@@ -68,3 +68,22 @@ export function toast(text) {
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => { el.hidden = true; }, 2600);
 }
+
+// 글 복사. 클립보드 기능이 없는 브라우저에서는 옛 방식으로 복사해요.
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.append(ta);
+    ta.select();
+    const done = document.execCommand('copy');
+    ta.remove();
+    return done;
+  }
+}

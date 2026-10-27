@@ -1,8 +1,8 @@
 import { rpc } from '../api.js';
 import { html, render, showMessage, setBusy, toast } from '../ui.js';
-import { fetchLogs, fetchParticipants, fetchPeople, fetchPhotos, ACTIVITY_TYPES, AREAS, splitLines, todayKst } from '../records.js';
+import { fetchLogs, fetchParticipants, fetchPeople, fetchPhotos, ACTIVITY_TYPES, AREAS, SUBJECTS, splitLines, todayKst } from '../records.js';
 import { uploadLogPhotos, deletePhoto, signedUrls, MAX_PHOTOS_PER_LOG } from '../photos.js';
-import { field, selectField, checkGroup, checkedValues, bindVagueHints } from '../form.js';
+import { field, selectField, checkGroup, checkedValues, bindVagueHints, saveSubjects } from '../form.js';
 
 // id 가 없으면 새로 쓰기
 export async function logFormView(el, ctx, id) {
@@ -67,6 +67,8 @@ export async function logFormView(el, ctx, id) {
         ${field({ name: 'next_steps', label: '다음 할 일', type: 'textarea', rows: 2,
           placeholder: '펌프 연결\n방수 처리', hint: '한 줄에 하나씩 써요.', value: (log.next_steps || []).join('\n') })}
         ${checkGroup({ name: 'areas', label: '생기부 영역 (고르지 않아도 돼요)', options: AREAS, values: log.areas })}
+        ${checkGroup({ name: 'subjects', label: '연계 교과 (고르지 않아도 돼요)', options: SUBJECTS, values: log.subjects,
+          hint: '이 활동에서 쓴 교과 지식을 고르면 생기부 정리에서 교과별로 모여요.' })}
         <fieldset class="field checks">
           <legend>사진 (최대 ${MAX_PHOTOS_PER_LOG}장)</legend>
           <div class="thumbs" id="log-photos">
@@ -138,6 +140,7 @@ export async function logFormView(el, ctx, id) {
     setBusy(btn, true, '저장 중…');
     try {
       const logId = await rpc('save_log', { p_id: id ? Number(id) : null, p_data: data });
+      await saveSubjects('log', logId, checkedValues(form, 'subjects'), log.subjects);
       let failed = 0;
       if (files.length) {
         failed = await uploadLogPhotos(me.user_id, Number(logId), files, (done, all) => { btn.textContent = `사진 올리는 중 ${done}/${all}`; });

@@ -29,6 +29,12 @@ export function meView(el, ctx) {
     </section>
 
     <section class="card narrow">
+      <h2 class="subtitle">${isStudent ? '내 기록 내려받기' : '전체 백업'}</h2>
+      <p class="muted">${isStudent ? '활동 일지, 이론 조사, 성찰을 엑셀 파일이나 PDF로 받아요.' : '모든 학생의 기록을 엑셀(CSV)과 백업 파일로 받아요.'}</p>
+      <a class="secondary button-link" href="#/backup">${isStudent ? '내려받기 화면으로' : '백업 화면으로'}</a>
+    </section>
+
+    <section class="card narrow">
       <h2 class="subtitle">비밀번호 바꾸기</h2>
       ${passwordFormMarkup()}
     </section>

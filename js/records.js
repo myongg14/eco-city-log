@@ -158,3 +158,62 @@ export async function fetchPhotos({ logIds } = {}) {
 export function won(n) {
   return `${Number(n || 0).toLocaleString('ko-KR')}원`;
 }
+
+// ---------------------------------------------------------------------
+// 4단계: 성찰, 피드백 댓글, 교과 연계
+// ---------------------------------------------------------------------
+
+export const COMPETENCIES = ['문제해결력', '협업능력', '탐구력', '창의성', '의사소통', '자기주도성', '리더십', '책임감', '정보활용', '공동체의식'];
+export const SUBJECTS = ['물리', '화학', '생명과학', '지구과학', '수학', '정보', '기술·가정', '통합사회', '국어', '영어', '미술'];
+
+// 그 날이 들어 있는 주의 월요일 'YYYY-MM-DD' (한국 시간)
+export function weekMonday(day = kstDay()) {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+export function addDays(day, n) {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+export function weekLabel(monday) {
+  if (!monday) return '최종 성찰';
+  const [, m, d] = monday.split('-').map(Number);
+  const end = addDays(monday, 6).split('-').map(Number);
+  return `${m}월 ${d}일 ~ ${end[1]}월 ${end[2]}일 주`;
+}
+
+export async function fetchReflections({ authorId, id } = {}) {
+  let q = sb.from('reflections').select('*');
+  if (authorId) q = q.eq('author_id', authorId);
+  if (id) q = q.eq('id', id);
+  return run(q.order('created_at', { ascending: false }));
+}
+
+// "kind:id" → [댓글] Map. targets: [{kind, ids}]
+export async function fetchComments(targets) {
+  const map = new Map();
+  for (const { kind, ids } of targets) {
+    if (!ids.length) continue;
+    const rows = await run(sb.from('comments').select('*').eq('target_kind', kind).in('target_id', ids).order('created_at'));
+    for (const c of rows) {
+      const k = `${c.target_kind}:${c.target_id}`;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(c);
+    }
+  }
+  return map;
+}
+
+// 내 기록에 다른 사람이 남긴, 아직 확인하지 않은 댓글
+export async function fetchUnreadComments(userId) {
+  const [rows, seen] = await Promise.all([
+    run(sb.from('comments').select('*').eq('target_author', userId).order('created_at', { ascending: false })),
+    run(sb.from('comment_seen').select('seen_at').eq('user_id', userId)),
+  ]);
+  const since = seen[0]?.seen_at ? new Date(seen[0].seen_at) : new Date(0);
+  return rows.filter((c) => c.author_id !== userId && new Date(c.created_at) > since);
+}

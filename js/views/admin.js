@@ -24,6 +24,14 @@ export async function adminView(el, ctx) {
     <section class="card" id="notice-admin"><p class="muted">공지를 불러오는 중…</p></section>
 
     <section class="card">
+      <div class="title-row">
+        <h2 class="subtitle">💾 전체 백업</h2>
+        <a class="secondary" href="#/backup">백업 화면으로</a>
+      </div>
+      <p class="muted">모든 학생의 기록을 엑셀(CSV)과 백업 파일로 받아요. 한 달에 한 번 받아 두면 안전해요.</p>
+    </section>
+
+    <section class="card">
       <h1 class="title">계정 관리</h1>
       <p class="muted">비밀번호를 초기화하면 ${INITIAL_PASSWORD}로 돌아가고, 다음 로그인 때 새 비밀번호를 만들어야 해요.</p>
       <input id="acc-search" type="search" placeholder="아이디, 이름, 팀으로 찾기">

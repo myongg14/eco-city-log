@@ -16,6 +16,11 @@ import { tasksView } from './views/tasks.js';
 import { suppliesView, purchaseFormView } from './views/supplies.js';
 import { galleryView } from './views/gallery.js';
 import { teamsView, teamView } from './views/teams.js';
+import { reflectionFormView } from './views/reflection-form.js';
+import { portfolioView } from './views/portfolio.js';
+import { searchView } from './views/search.js';
+import { backupView } from './views/backup.js';
+import { fetchUnreadComments } from './records.js';
 
 const state = {
   session: null,
@@ -24,6 +29,8 @@ const state = {
   teams: [],         // 볼 수 있는 모든 팀
   previousLoginAt: null,
 };
+
+const unread = { at: 0, count: 0 };   // 새 피드백 숫자 (1분 동안 기억)
 
 const appEl = document.getElementById('app');
 const navEl = document.getElementById('nav');
@@ -54,6 +61,7 @@ export async function refreshMe() {
 }
 
 export async function logout() {
+  unread.at = 0;
   await sb.auth.signOut();
   state.session = null;
   state.me = null;
@@ -77,14 +85,16 @@ function renderNav(current) {
   }
   const links = [
     { path: '/home', label: '홈' },
-    { path: '/records', label: isStaff() ? '학생 기록' : '내 기록' },
+    { path: '/records', label: isStaff() ? '학생 기록' : '내 기록', also: '/reflection/' },
+    { path: '/portfolio', label: '생기부' },
     { path: '/teams', label: '팀', also: '/team/' },
     { path: '/tasks', label: '할 일' },
     { path: '/supplies', label: '물품' },
     { path: '/gallery', label: '갤러리' },
     { path: '/library', label: '자료실' },
+    { path: '/search', label: '검색' },
     { path: '/guide', label: '안내' },
-    { path: '/me', label: '내 정보' },
+    { path: '/me', label: '내 정보', also: '/backup' },
   ];
   if (isStaff()) links.push({ path: '/admin', label: '관리' });
   navEl.hidden = false;
@@ -93,10 +103,30 @@ function renderNav(current) {
     <button type="button" class="link-button" id="logout-btn">로그아웃</button>
   `);
   navEl.querySelector('#logout-btn').addEventListener('click', logout);
+  if (state.me.role === 'student') showUnreadBadge(current);
   // 휴대폰에서 메뉴가 옆으로 밀릴 때 지금 화면 메뉴가 보이게 가운데로 옮겨요.
   const active = navEl.querySelector('a.active');
   if (active && navEl.scrollWidth > navEl.clientWidth) {
     navEl.scrollLeft = active.offsetLeft - navEl.clientWidth / 2 + active.offsetWidth / 2;
+  }
+}
+
+// 내 기록에 새 피드백 댓글이 있으면 '내 기록' 메뉴에 숫자를 붙여요. 1분에 한 번만 확인해요.
+async function showUnreadBadge(current) {
+  if (current.startsWith('/records')) {
+    unread.count = 0;
+    unread.at = Date.now();
+  } else if (Date.now() - unread.at > 60000) {
+    try {
+      unread.count = (await fetchUnreadComments(state.me.user_id)).length;
+      unread.at = Date.now();
+    } catch {
+      return;
+    }
+  }
+  const link = navEl.querySelector('a[href="#/records"]');
+  if (link && unread.count && !link.querySelector('.nav-badge')) {
+    link.insertAdjacentHTML('beforeend', `<span class="nav-badge" aria-label="새 피드백">${unread.count}</span>`);
   }
 }
 
@@ -116,6 +146,7 @@ function renderFab(show) {
     <div class="fab-menu" hidden>
       <a href="#/log/new">📒 활동 일지</a>
       <a href="#/research/new">📚 이론 조사</a>
+      <a href="#/reflection/new">🪞 이번 주 성찰</a>
       <a href="#/plan">📝 개인 계획서</a>
       <a href="#/supplies/new">🛒 물품 신청</a>
     </div>
@@ -165,6 +196,8 @@ async function route() {
     const id = edit[2] === 'new' ? null : edit[2];
     return edit[1] === 'log' ? logFormView(appEl, ctx, id) : researchFormView(appEl, ctx, id);
   }
+  const refl = path.match(/^\/reflection\/(new|\d+)$/);
+  if (refl) return isStudent ? reflectionFormView(appEl, ctx, refl[1] === 'new' ? null : refl[1], params) : go('/records');
   const purchase = path.match(/^\/supplies\/(new|\d+)$/);
   if (purchase) return purchaseFormView(appEl, ctx, purchase[1] === 'new' ? null : purchase[1]);
   const teamPage = path.match(/^\/team\/(\d+)$/);
@@ -184,6 +217,12 @@ async function route() {
       return isStudent ? planView(appEl, ctx) : go('/records');
     case '/library':
       return libraryView(appEl, ctx);
+    case '/portfolio':
+      return portfolioView(appEl, ctx, params);
+    case '/search':
+      return searchView(appEl, ctx, params);
+    case '/backup':
+      return backupView(appEl, ctx);
     case '/guide':
       return guideView(appEl, ctx);
     case '/me':
