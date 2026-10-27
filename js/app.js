@@ -6,16 +6,24 @@ import { profileView } from './views/profile.js';
 import { homeView } from './views/home.js';
 import { meView } from './views/me.js';
 import { adminView } from './views/admin.js';
+import { recordsView } from './views/records.js';
+import { planView } from './views/plan.js';
+import { researchFormView } from './views/research-form.js';
+import { logFormView } from './views/log-form.js';
+import { libraryView } from './views/library.js';
+import { guideView } from './views/guide.js';
 
 const state = {
   session: null,
   me: null,          // profiles 행
   team: null,        // 내 팀
+  teams: [],         // 볼 수 있는 모든 팀
   previousLoginAt: null,
 };
 
 const appEl = document.getElementById('app');
 const navEl = document.getElementById('nav');
+const fabEl = document.getElementById('fab');
 
 export function go(path) {
   if (location.hash === `#${path}`) route();
@@ -37,12 +45,8 @@ export async function refreshMe() {
     state.session = null;
     return;
   }
-  if (state.me.team_id) {
-    const teams = await fetchTeams();
-    state.team = teams.find((t) => t.id === state.me.team_id) || null;
-  } else {
-    state.team = null;
-  }
+  state.teams = await fetchTeams();
+  state.team = state.teams.find((t) => t.id === state.me.team_id) || null;
 }
 
 export async function logout() {
@@ -60,26 +64,70 @@ function isStaff() {
 }
 
 function renderNav(current) {
-  if (!state.me || state.me.must_change_password || !state.me.profile_completed) {
+  const ready = state.me && !state.me.must_change_password && state.me.profile_completed;
+  renderFab(ready && state.me.role === 'student');
+  if (!ready) {
     navEl.hidden = true;
     navEl.innerHTML = '';
     return;
   }
   const links = [
     { path: '/home', label: '홈' },
+    { path: '/records', label: isStaff() ? '학생 기록' : '내 기록' },
+    { path: '/library', label: '자료실' },
+    { path: '/guide', label: '안내' },
     { path: '/me', label: '내 정보' },
   ];
   if (isStaff()) links.push({ path: '/admin', label: '관리' });
   navEl.hidden = false;
   render(navEl, html`
-    ${links.map((l) => html`<a href="#${l.path}" class="${l.path === current ? 'active' : ''}">${l.label}</a>`)}
+    ${links.map((l) => html`<a href="#${l.path}" class="${current.startsWith(l.path) ? 'active' : ''}">${l.label}</a>`)}
     <button type="button" class="link-button" id="logout-btn">로그아웃</button>
   `);
   navEl.querySelector('#logout-btn').addEventListener('click', logout);
 }
 
+// 어느 화면에서나 누르는 기록하기(+) 버튼. 학생만 보여요.
+function renderFab(show) {
+  if (!show) {
+    fabEl.hidden = true;
+    fabEl.innerHTML = '';
+    return;
+  }
+  if (!fabEl.hidden && fabEl.innerHTML) {
+    fabEl.querySelector('.fab-menu').hidden = true;
+    return;
+  }
+  fabEl.hidden = false;
+  render(fabEl, html`
+    <div class="fab-menu" hidden>
+      <a href="#/log/new">📒 활동 일지</a>
+      <a href="#/research/new">📚 이론 조사</a>
+      <a href="#/plan">📝 개인 계획서</a>
+    </div>
+    <button type="button" class="fab-btn" aria-label="기록하기" aria-expanded="false">＋</button>
+  `);
+  const menu = fabEl.querySelector('.fab-menu');
+  const btn = fabEl.querySelector('.fab-btn');
+  btn.addEventListener('click', () => {
+    menu.hidden = !menu.hidden;
+    btn.setAttribute('aria-expanded', String(!menu.hidden));
+  });
+  menu.addEventListener('click', () => { menu.hidden = true; });
+}
+
+// 화면마다 새 상자를 만들어 넘겨요. 늦게 도착한 이전 화면의 데이터가 새 화면을 덮어쓰지 않게 하려고요.
+function freshView() {
+  const view = document.createElement('div');
+  appEl.replaceChildren(view);
+  return view;
+}
+
 async function route() {
-  const path = (location.hash.replace(/^#/, '') || '/home').split('?')[0];
+  const appEl = freshView();
+  const [rawPath, query = ''] = (location.hash.replace(/^#/, '') || '/home').split('?');
+  const path = rawPath || '/home';
+  const params = new URLSearchParams(query);
 
   if (!state.session) {
     renderNav('/login');
@@ -95,7 +143,23 @@ async function route() {
   }
 
   renderNav(path);
+  window.scrollTo(0, 0);
+  const isStudent = state.me.role === 'student';
+  const edit = path.match(/^\/(log|research)\/(new|\d+)$/);
+  if (edit) {
+    if (!isStudent) return go('/records');
+    const id = edit[2] === 'new' ? null : edit[2];
+    return edit[1] === 'log' ? logFormView(appEl, ctx, id) : researchFormView(appEl, ctx, id);
+  }
   switch (path) {
+    case '/records':
+      return recordsView(appEl, ctx, params);
+    case '/plan':
+      return isStudent ? planView(appEl, ctx) : go('/records');
+    case '/library':
+      return libraryView(appEl, ctx);
+    case '/guide':
+      return guideView(appEl, ctx);
     case '/me':
       return meView(appEl, ctx);
     case '/admin':

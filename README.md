@@ -13,6 +13,9 @@ GitHub Pages(화면)와 Supabase(데이터베이스·로그인)로 돌아가며,
 
 여러 번 실행해도 계정이 중복으로 생기지 않아요.
 
+그다음 같은 방법으로 `supabase/02_records.sql`(계획서·이론 조사·활동 일지)을 실행해요. 결과에 표 이름 4개가 나오면 성공이에요.
+SQL 파일은 **번호 순서대로** 실행해요. 01을 다시 실행했다면 그 뒤 파일들도 다시 실행해 주세요(함수 실행 권한이 초기화돼요).
+
 ### 2. 아무나 가입하지 못하게 막기
 **Authentication → Sign In / Providers**(또는 Settings)에서 **Allow new users to sign up** 을 끕니다.
 계정은 위 SQL과 관리 화면에서만 만들어요.
@@ -66,5 +69,13 @@ js/api.js             Supabase 연결
 js/app.js             화면 이동과 로그인 상태 관리
 js/views/*.js         각 화면
 js/vendor/supabase.js Supabase 라이브러리 (supabase-js 2.118.0)
-supabase/*.sql        데이터베이스 만드는 SQL (순서대로 실행)
+js/records.js         기록 읽기 도우미, 공통 목록(출처 종류, 활동 유형 등)
+js/form.js            기록 양식 입력칸, "열심히" 같은 막연한 표현 안내
+supabase/*.sql        데이터베이스 만드는 SQL (번호 순서대로 실행)
 ```
+
+## 데이터 모델에서 바꾼 점
+- 모든 쓰기는 데이터베이스 함수(`save_plan`, `save_research`, `save_log` 등)로만 해요. 표에는 읽기 권한만 열어 두고, 함수 안에서 "쓴 사람만 고치기·지우기", 필수 항목, 링크 형식(http/https만)을 검사해요.
+- 기록은 학생 계정만 쓸 수 있어요. 관리자·선생님은 모든 기록을 읽어요.
+- 꺼진 예비 팀 학생의 기록은 관리자·선생님만 볼 수 있어요.
+- 활동 시간은 일지마다 적지만 자동으로 합치지는 않아요(사용자 요청).

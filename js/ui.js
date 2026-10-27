@@ -56,7 +56,7 @@ export function formatDateTime(value) {
   if (!value) return '기록 없음';
   const d = new Date(value);
   return d.toLocaleString('ko-KR', {
-    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul',
   });
 }
 
