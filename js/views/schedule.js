@@ -39,6 +39,17 @@ export async function scheduleView(el, ctx, params) {
       <a href="#/schedule?t=test" class="${tab === 'test' ? 'active' : ''}">통합 테스트</a>
     </div>`;
 
+  // 관리자·선생님: 위쪽 추가 버튼을 누르면 맨 아래 입력칸을 열고 그곳으로 내려가요.
+  el.addEventListener('click', (e) => {
+    const jump = e.target.closest('[data-jump]');
+    if (!jump) return;
+    const box = el.querySelector(`#${jump.dataset.jump}`);
+    if (!box) return;
+    box.open = true;
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    box.querySelector('input')?.focus({ preventScroll: true });
+  });
+
   if (tab === 'test') return drawChecks();
   return drawCalendar();
 
@@ -66,6 +77,7 @@ export async function scheduleView(el, ctx, params) {
       <section class="card">
         <h1 class="title">통합 일정</h1>
         <p class="muted">모든 팀의 마감과 모형을 합치는 날을 한 달력에 모았어요. 할 일 보드의 마감일도 함께 보여요.</p>
+        ${isStaff ? html`<p><button type="button" class="primary" data-jump="ev-new">+ 일정 추가</button></p>` : ''}
         ${tabs}
         <div class="cal-head">
           <a class="secondary small" href="#/schedule?m=${shiftMonth(month, -1)}" aria-label="이전 달">‹</a>
@@ -174,6 +186,7 @@ export async function scheduleView(el, ctx, params) {
       <section class="card">
         <h1 class="title">통합 테스트</h1>
         <p class="muted">모형을 합쳤을 때 확인할 항목이에요. 맡은 팀이 직접 확인하고 결과를 기록해요. 실패하면 원인을 메모에 남겨 주세요.</p>
+        ${isStaff ? html`<p><button type="button" class="primary" data-jump="ck-new">+ 확인할 항목 추가</button></p>` : ''}
         ${tabs}
         <div class="progress" role="img" aria-label="통과 ${pct}%"><span style="width:${pct}%"></span></div>
         <p class="hint">${checks.length ? `${checks.length}개 중 통과 ${count('통과')} · 실패 ${count('실패')} · 대기 ${count('대기')}` : ''}</p>
@@ -204,7 +217,7 @@ export async function scheduleView(el, ctx, params) {
 
       ${isStaff ? html`
         <section class="card">
-          <details ${editing ? 'open' : ''}>
+          <details ${editing ? 'open' : ''} id="ck-new">
             <summary>${editing ? '항목 고치기' : '+ 확인할 항목 추가'}</summary>
             <form id="ckn-form" novalidate>
               ${field({ name: 'title', label: '확인할 항목', required: true, placeholder: '예: 발전 설비 → 배터리 충전 전압 5V 유지', value: ck.title })}
