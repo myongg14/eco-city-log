@@ -19,6 +19,7 @@ GitHub Pages(화면)와 Supabase(데이터베이스·로그인)로 돌아가며,
 - `supabase/04_photos_storage.sql`: 사진 파일 저장소(비공개 버킷 `photos`). 결과에 `photos`가 나오면 성공이에요. 사진은 로그인한 사람만 볼 수 있고, 학생은 자기 폴더에만 올리고 지울 수 있어요.
 - `supabase/05_reflection_feedback.sql`: 성찰·선생님 피드백 댓글·교과 연계 태그. 결과에 표 이름 3개(comment_seen, comments, reflections)가 나오면 성공이에요.
 - `supabase/06_schedule_roles.sql`: 통합 일정·통합 테스트 체크리스트·역할 분담과 변경 이력·알림 확인 시각. 결과에 표 이름 5개가 나오면 성공이에요.
+- `supabase/07_progress_feedback.sql`: 기능 구현 현황·실험·측정 기록장·친구 칭찬·조언·팀 간 요청과 답변. 결과에 표 이름 5개가 나오면 성공이에요.
 SQL 파일은 **번호 순서대로** 실행해요. 01을 다시 실행했다면 그 뒤 파일들도 다시 실행해 주세요(함수 실행 권한이 초기화돼요).
 
 ### 2. 아무나 가입하지 못하게 막기
