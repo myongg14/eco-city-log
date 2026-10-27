@@ -60,7 +60,14 @@ export function researchCard(r, { people, teams, meId, showAuthor = true }) {
     </article>`;
 }
 
-export function logCard(l, { people, teams, meId, participants, showAuthor = true }) {
+function thumbs(photos, urls) {
+  if (!photos?.length) return '';
+  return html`<div class="thumbs small">${photos.map((ph) => (urls?.get(ph.path)
+    ? html`<a class="thumb" href="${urls.get(ph.path)}" target="_blank" rel="noopener"><img src="${urls.get(ph.path)}" alt="일지 사진" loading="lazy"></a>`
+    : ''))}</div>`;
+}
+
+export function logCard(l, { people, teams, meId, participants, photos, urls, showAuthor = true }) {
   const team = teams.find((t) => t.id === l.team_id);
   const with_ = (participants?.get(l.id) || []).map((u) => personName(people, u));
   const firstLine = String(l.did || '').split('\n')[0];
@@ -77,6 +84,7 @@ export function logCard(l, { people, teams, meId, participants, showAuthor = tru
         ${showAuthor ? html`${personName(people, l.author_id)}${team ? html` · ${team.name}` : ''}` : ''}
         ${with_.length ? html`${showAuthor ? ' · ' : ''}같이 한 사람: ${with_.join(', ')}` : ''}
       </p>
+      ${thumbs(photos?.get(l.id), urls)}
       <details>
         <summary>내용 보기</summary>
         ${para('한 일', l.did)}

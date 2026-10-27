@@ -1,13 +1,14 @@
 import { html, render, formatDateTime } from '../ui.js';
 import { PROJECT_DEADLINE } from '../config.js';
-import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, personName, formatDate } from '../records.js';
+import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchNotices, fetchTasks, fetchPurchases, fetchBudget, budgetSummary, personName, formatDate, won } from '../records.js';
+import { noticeBoard } from './notices.js';
+import { taskCard } from './tasks.js';
 
 // 다음 단계에 열릴 메뉴들. 열리면 이 목록에서 빼고 nav 에 넣습니다.
 const UPCOMING = [
-  { title: '물품 신청', desc: '필요한 물품을 신청하고 승인 상태와 예산을 확인해요.' },
-  { title: '팀 페이지·할 일 보드', desc: '팀별 목표와 진행률, 예정/진행/완료 할 일을 한눈에 봐요.' },
-  { title: '사진 갤러리·공지', desc: '일지 사진으로 모형이 완성되는 과정을 모아 봐요.' },
-  { title: '성찰·생기부 정리', desc: '내 기록을 자율·동아리·진로 영역별로 모아 봐요.' },
+  { title: '성찰', desc: '매주 잘한 점, 어려웠던 점, 새로 배운 것을 돌아봐요.' },
+  { title: '생기부 정리', desc: '내 기록을 자율·동아리·진로 영역별로 모아 초안을 만들어요.' },
+  { title: '선생님 피드백·검색·백업', desc: '선생님 댓글, 모든 기록 한 번에 찾기, 내 기록 내려받기.' },
 ];
 
 function daysLeft() {
@@ -21,7 +22,8 @@ export async function homeView(el, ctx) {
   const isStudent = me.role === 'student';
   const roleLabel = me.role === 'admin' ? '관리자' : me.role === 'teacher' ? '선생님' : null;
 
-  const draw = (extra) => render(el, html`
+  const draw = (extra, top = '') => render(el, html`
+    ${top}
     <section class="card">
       <h1 class="title">${me.display_name}님, 안녕하세요</h1>
       <p class="muted">
@@ -52,7 +54,11 @@ export async function homeView(el, ctx) {
   draw();
 
   try {
-    const [people, plan, myResearch, myLogs, recentResearch, recentLogs] = await Promise.all([
+    const [notices, tasks, purchases, total, people, plan, myResearch, myLogs, recentResearch, recentLogs] = await Promise.all([
+      fetchNotices({ limit: 5 }),
+      fetchTasks(),
+      fetchPurchases(),
+      fetchBudget(),
       fetchPeople(),
       isStudent ? fetchPlan(me.user_id) : null,
       isStudent ? fetchResearch({ authorId: me.user_id }) : [],
@@ -65,7 +71,24 @@ export async function homeView(el, ctx) {
       ...recentLogs.map((l) => ({ when: l.created_at, kind: `일지 · ${l.activity_type}`, text: String(l.did).split('\n')[0], who: l.author_id, team: l.team_id })),
     ].sort((a, b) => (a.when < b.when ? 1 : -1)).slice(0, 5);
 
+    // 이번 주 할 일: 내 것(학생) 또는 전체(관리자·선생님) 중 끝나지 않았고 7일 안에 마감이거나 지난 것
+    const weekEnd = new Date(Date.now() + 7 * 86400000 + 9 * 3600000).toISOString().slice(0, 10);
+    const soon = tasks.filter((t) => t.status !== '완료' && (isStudent ? t.assignee_id === me.user_id : true)
+      && (!t.due_date || t.due_date <= weekEnd))
+      .sort((a, b) => (a.due_date || '9') < (b.due_date || '9') ? -1 : 1).slice(0, 6);
+    const waiting = purchases.filter((p) => p.status === '신청');
+    const b = budgetSummary(total, purchases);
+
     draw(html`
+      <section class="card">
+        <div class="title-row"><h2 class="subtitle">${isStudent ? '이번 주 내 할 일' : '이번 주 할 일'}</h2><a class="link small" href="#/tasks">할 일 보드</a></div>
+        ${soon.length ? html`<div class="timeline">${soon.map((t) => taskCard(t, { people, teams, me, compact: true }))}</div>`
+          : html`<p class="muted">${isStudent ? '이번 주에 마감인 내 할 일이 없어요.' : '이번 주 마감인 할 일이 없어요.'}</p>`}
+      </section>
+      <section class="card">
+        <div class="title-row"><h2 class="subtitle">물품 · 예산</h2><a class="link small" href="#/supplies${waiting.length && me.role === 'teacher' ? '?t=wait' : ''}">물품 신청</a></div>
+        <p>${me.role === 'teacher' && waiting.length ? html`<strong class="warn-text">승인 대기 ${waiting.length}건</strong> · ` : waiting.length ? `승인 대기 ${waiting.length}건 · ` : ''}남은 예산 <strong>${won(b.left)}</strong> / ${won(b.total)}</p>
+      </section>
       ${isStudent ? html`
         <section class="card">
           <h2 class="subtitle">내 기록</h2>
@@ -93,7 +116,7 @@ export async function homeView(el, ctx) {
           <a class="link" href="#/${isStudent ? 'library' : 'records'}">더 보기</a>`
         : html`<p class="muted">아직 아무도 기록을 쓰지 않았어요. ${isStudent ? '첫 기록의 주인공이 되어 보세요!' : ''}</p>`}
       </section>
-    `);
+    `, noticeBoard(notices));
   } catch (err) {
     draw(html`<section class="card"><p class="message error">${err.message}</p></section>`);
   }

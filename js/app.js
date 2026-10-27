@@ -12,6 +12,10 @@ import { researchFormView } from './views/research-form.js';
 import { logFormView } from './views/log-form.js';
 import { libraryView } from './views/library.js';
 import { guideView } from './views/guide.js';
+import { tasksView } from './views/tasks.js';
+import { suppliesView, purchaseFormView } from './views/supplies.js';
+import { galleryView } from './views/gallery.js';
+import { teamsView, teamView } from './views/teams.js';
 
 const state = {
   session: null,
@@ -74,6 +78,10 @@ function renderNav(current) {
   const links = [
     { path: '/home', label: '홈' },
     { path: '/records', label: isStaff() ? '학생 기록' : '내 기록' },
+    { path: '/teams', label: '팀', also: '/team/' },
+    { path: '/tasks', label: '할 일' },
+    { path: '/supplies', label: '물품' },
+    { path: '/gallery', label: '갤러리' },
     { path: '/library', label: '자료실' },
     { path: '/guide', label: '안내' },
     { path: '/me', label: '내 정보' },
@@ -81,10 +89,15 @@ function renderNav(current) {
   if (isStaff()) links.push({ path: '/admin', label: '관리' });
   navEl.hidden = false;
   render(navEl, html`
-    ${links.map((l) => html`<a href="#${l.path}" class="${current.startsWith(l.path) ? 'active' : ''}">${l.label}</a>`)}
+    ${links.map((l) => html`<a href="#${l.path}" class="${current.startsWith(l.path) || (l.also && current.startsWith(l.also)) ? 'active' : ''}">${l.label}</a>`)}
     <button type="button" class="link-button" id="logout-btn">로그아웃</button>
   `);
   navEl.querySelector('#logout-btn').addEventListener('click', logout);
+  // 휴대폰에서 메뉴가 옆으로 밀릴 때 지금 화면 메뉴가 보이게 가운데로 옮겨요.
+  const active = navEl.querySelector('a.active');
+  if (active && navEl.scrollWidth > navEl.clientWidth) {
+    navEl.scrollLeft = active.offsetLeft - navEl.clientWidth / 2 + active.offsetWidth / 2;
+  }
 }
 
 // 어느 화면에서나 누르는 기록하기(+) 버튼. 학생만 보여요.
@@ -104,6 +117,7 @@ function renderFab(show) {
       <a href="#/log/new">📒 활동 일지</a>
       <a href="#/research/new">📚 이론 조사</a>
       <a href="#/plan">📝 개인 계획서</a>
+      <a href="#/supplies/new">🛒 물품 신청</a>
     </div>
     <button type="button" class="fab-btn" aria-label="기록하기" aria-expanded="false">＋</button>
   `);
@@ -151,7 +165,19 @@ async function route() {
     const id = edit[2] === 'new' ? null : edit[2];
     return edit[1] === 'log' ? logFormView(appEl, ctx, id) : researchFormView(appEl, ctx, id);
   }
+  const purchase = path.match(/^\/supplies\/(new|\d+)$/);
+  if (purchase) return purchaseFormView(appEl, ctx, purchase[1] === 'new' ? null : purchase[1]);
+  const teamPage = path.match(/^\/team\/(\d+)$/);
+  if (teamPage) return teamView(appEl, ctx, teamPage[1]);
   switch (path) {
+    case '/teams':
+      return teamsView(appEl, ctx);
+    case '/tasks':
+      return tasksView(appEl, ctx, params);
+    case '/supplies':
+      return suppliesView(appEl, ctx, params);
+    case '/gallery':
+      return galleryView(appEl, ctx, params);
     case '/records':
       return recordsView(appEl, ctx, params);
     case '/plan':

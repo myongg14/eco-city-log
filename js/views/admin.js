@@ -1,6 +1,7 @@
 import { rpc, fetchTeams } from '../api.js';
 import { html, render, showMessage, setBusy, toast, formatDateTime } from '../ui.js';
 import { INITIAL_PASSWORD } from '../config.js';
+import { noticeAdmin } from './notices.js';
 
 const ROLE_LABEL = { admin: '관리자', teacher: '선생님', student: '학생' };
 
@@ -20,6 +21,8 @@ export async function adminView(el, ctx) {
   let query = '';
 
   render(el, html`
+    <section class="card" id="notice-admin"><p class="muted">공지를 불러오는 중…</p></section>
+
     <section class="card">
       <h1 class="title">계정 관리</h1>
       <p class="muted">비밀번호를 초기화하면 ${INITIAL_PASSWORD}로 돌아가고, 다음 로그인 때 새 비밀번호를 만들어야 해요.</p>
@@ -71,6 +74,8 @@ export async function adminView(el, ctx) {
       <p class="message" id="team-msg" hidden></p>
     </section>
   `);
+
+  noticeAdmin(el.querySelector('#notice-admin'));
 
   const body = el.querySelector('#acc-body');
   const accMsg = el.querySelector('#acc-msg');

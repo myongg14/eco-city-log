@@ -1,6 +1,7 @@
 import { rpc } from '../api.js';
 import { html, render, toast } from '../ui.js';
-import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchJoinedLogs, fetchParticipants, personName, kstDay } from '../records.js';
+import { fetchPeople, fetchPlan, fetchResearch, fetchLogs, fetchJoinedLogs, fetchParticipants, fetchPhotos, personName, kstDay } from '../records.js';
+import { signedUrls, deletePhoto } from '../photos.js';
 import { researchCard, logCard, planCard } from './cards.js';
 
 // 내 기록 (?u=아이디 로 다른 사람 기록도 볼 수 있어요. 읽기만)
@@ -9,7 +10,7 @@ export async function recordsView(el, ctx, params) {
   const teams = ctx.state.teams || [];
   render(el, html`<section class="card"><p class="muted">불러오는 중…</p></section>`);
 
-  let people, target, plan, research, logs, joined, participants;
+  let people, target, plan, research, logs, joined, participants, photos, urls;
   try {
     people = await fetchPeople();
     const wanted = params.get('u');
@@ -29,7 +30,9 @@ export async function recordsView(el, ctx, params) {
       fetchJoinedLogs(target.user_id),
     ]);
     joined = joined.filter((l) => l.author_id !== target.user_id);
-    participants = await fetchParticipants([...logs, ...joined].map((l) => l.id));
+    const logIds = [...logs, ...joined].map((l) => l.id);
+    [participants, photos] = await Promise.all([fetchParticipants(logIds), fetchPhotos({ logIds })]);
+    urls = await signedUrls([...photos.values()].flat()).catch(() => new Map());
   } catch (err) {
     render(el, html`<section class="card"><p class="message error">${err.message}</p></section>`);
     return;
@@ -51,7 +54,7 @@ export async function recordsView(el, ctx, params) {
     .sort((a, b) => (a.sort < b.sort ? 1 : -1));
 
   const bySource = research.reduce((m, r) => m.set(r.source_type, (m.get(r.source_type) || 0) + 1), new Map());
-  const cardCtx = { people, teams, meId: me.user_id, participants };
+  const cardCtx = { people, teams, meId: me.user_id, participants, photos, urls };
   const link = (f) => `#/records?${new URLSearchParams({ ...(params.get('u') ? { u: params.get('u') } : {}), f })}`;
 
   render(el, html`
@@ -118,6 +121,10 @@ export async function recordsView(el, ctx, params) {
     if (!window.confirm(kind === 'log' ? '이 일지를 지울까요? 되돌릴 수 없어요.' : '이 조사 기록을 지울까요? 되돌릴 수 없어요.')) return;
     btn.disabled = true;
     try {
+      if (kind === 'log') {
+        // 사진 파일을 먼저 지워요. 일지를 지우면 사진 기록은 자동으로 지워지지만 파일은 남기 때문이에요.
+        for (const ph of photos.get(Number(btn.dataset.id)) || []) await deletePhoto(ph.id);
+      }
       await rpc(kind === 'log' ? 'delete_log' : 'delete_research', { p_id: Number(btn.dataset.id) });
       toast('지웠어요.');
       recordsView(el, ctx, params);

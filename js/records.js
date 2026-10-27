@@ -97,3 +97,64 @@ export function kstDay(value = Date.now()) {
 export function todayKst() {
   return kstDay();
 }
+
+// ---------------------------------------------------------------------
+// 3단계: 공지, 할 일, 물품 신청, 일지 사진
+// ---------------------------------------------------------------------
+
+export const TASK_STATUSES = ['예정', '진행', '완료'];
+export const PURCHASE_STATUSES = ['신청', '승인', '반려', '구매 완료', '수령'];
+// 예산에서 '쓴 돈'으로 보는 상태 (선생님이 승인한 뒤부터)
+export const SPENT_STATUSES = ['승인', '구매 완료', '수령'];
+
+export async function fetchNotices({ limit } = {}) {
+  let q = sb.from('notices').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false });
+  if (limit) q = q.limit(limit);
+  return run(q);
+}
+
+export async function fetchTasks({ teamId, assigneeId } = {}) {
+  let q = sb.from('tasks').select('*');
+  if (teamId) q = q.eq('team_id', teamId);
+  if (assigneeId) q = q.eq('assignee_id', assigneeId);
+  return run(q.order('due_date', { ascending: true, nullsFirst: false }).order('id'));
+}
+
+export async function fetchPurchases({ id, teamId } = {}) {
+  let q = sb.from('purchase_requests').select('*');
+  if (id) q = q.eq('id', id);
+  if (teamId) q = q.eq('team_id', teamId);
+  return run(q.order('created_at', { ascending: false }));
+}
+
+export async function fetchBudget() {
+  const rows = await run(sb.from('app_settings').select('key, value').eq('key', 'total_budget'));
+  return Number(rows[0]?.value ?? 1600000);
+}
+
+export function budgetSummary(total, purchases) {
+  const sum = (list) => list.reduce((s, p) => s + Number(p.total_price || 0), 0);
+  const spent = sum(purchases.filter((p) => SPENT_STATUSES.includes(p.status)));
+  const pending = sum(purchases.filter((p) => p.status === '신청'));
+  return { total, spent, pending, left: total - spent, afterPending: total - spent - pending };
+}
+
+// log_id → [사진 행] Map
+export async function fetchPhotos({ logIds } = {}) {
+  let q = sb.from('log_photos').select('*');
+  if (logIds) {
+    if (!logIds.length) return new Map();
+    q = q.in('log_id', logIds);
+  }
+  const rows = await run(q.order('created_at'));
+  const map = new Map();
+  for (const r of rows) {
+    if (!map.has(r.log_id)) map.set(r.log_id, []);
+    map.get(r.log_id).push(r);
+  }
+  return map;
+}
+
+export function won(n) {
+  return `${Number(n || 0).toLocaleString('ko-KR')}원`;
+}
