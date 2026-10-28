@@ -471,3 +471,4 @@ svg.linkmap .lm-link.on line { stroke: var(--primary); stroke-width: 2.5; }
   body.printing-present .chart-table { display: none; }
   body.printing-present .present-photos { grid-template-columns: repeat(3, 1fr); }
 }
+.draft-bar { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: #fef9c3; color: #713f12; font-size: 0.92rem; }

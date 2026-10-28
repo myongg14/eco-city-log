@@ -30,6 +30,7 @@ import { linksView } from './views/links.js';
 import { presentView } from './views/present.js';
 import { showcaseView, showcaseSettingsView } from './views/showcase.js';
 import { fetchAlerts } from './records.js';
+import { startDrafts, stopDrafts } from './drafts.js';
 
 const state = {
   session: null,
@@ -71,6 +72,7 @@ export async function refreshMe() {
 
 export async function logout() {
   unread.at = 0;
+  stopDrafts();
   await sb.auth.signOut();
   state.session = null;
   state.me = null;
@@ -198,6 +200,7 @@ async function route() {
     return showcaseView(appEl, ctx);
   }
   if (!state.session) {
+    stopDrafts();
     renderNav('/login');
     return loginView(appEl, ctx);
   }
@@ -212,6 +215,7 @@ async function route() {
 
   renderNav(path);
   window.scrollTo(0, 0);
+  startDrafts(document.getElementById('app'), state.me.user_id);
   const isStudent = state.me.role === 'student';
   const edit = path.match(/^\/(log|research)\/(new|\d+)$/);
   if (edit) {
@@ -284,6 +288,7 @@ window.addEventListener('hashchange', route);
 
 sb.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT' && state.session) {
+    stopDrafts();
     state.session = null;
     state.me = null;
     route();

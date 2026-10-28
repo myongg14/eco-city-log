@@ -124,7 +124,7 @@ export async function measureFormView(el, ctx, id) {
             <table class="table points"><thead><tr><th>가로축 값</th><th>측정값</th><th>메모</th><th></th></tr></thead>
               <tbody id="ms-rows">${rows.map((p) => rowMarkup(p))}</tbody></table>
           </div>
-          <button type="button" class="secondary small" id="ms-add">+ 줄 추가</button>
+          <button type="button" class="secondary small" id="ms-add" data-draft-grow="px">+ 줄 추가</button>
           <p class="hint">숫자만 써요. 단위는 위 ‘단위’ 칸에 한 번만 쓰면 돼요.</p>
         </fieldset>
         <div id="ms-preview"></div>
